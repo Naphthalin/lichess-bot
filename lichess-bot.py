@@ -606,7 +606,7 @@ def play_game(li: LICHESS_TYPE,
     abort_time = seconds(config.abort_time)
     game = model.Game(initial_state, user_profile["username"], li.baseUrl, abort_time)
 
-    with engine_wrapper.create_engine(config) as engine:
+    with engine_wrapper.create_engine(config, game) as engine:
         engine.get_opponent_info(game)
         logger.debug(f"The engine for game {game_id} has pid={engine.get_pid()}")
         conversation = Conversation(game, engine, li, __version__, challenge_queue)
@@ -1052,7 +1052,7 @@ def start_lichess_bot() -> None:
 
     CONFIG = load_config(args.config or "./config.yml")
     logger.info("Checking engine configuration ...")
-    with engine_wrapper.create_engine(CONFIG):
+    with engine_wrapper.create_engine(CONFIG, None):
         pass
     logger.info("Engine configuration OK")
 

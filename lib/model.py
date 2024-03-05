@@ -158,7 +158,7 @@ class Game:
         self.mode = "rated" if game_info.get("rated") else "casual"
         self.white = Player(game_info["white"])
         self.black = Player(game_info["black"])
-        self.initial_fen = game_info.get("initialFen")
+        self.initial_fen: str = game_info.get("initialFen", "")
         self.state: dict[str, Any] = game_info["state"]
         self.is_white = (self.white.name or "").lower() == username.lower()
         self.my_color = "white" if self.is_white else "black"

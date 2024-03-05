@@ -12,6 +12,7 @@ import datetime
 import time
 import random
 import math
+import json
 import test_bot.lichess
 from collections import Counter
 from collections.abc import Callable
@@ -33,7 +34,7 @@ logger = logging.getLogger(__name__)
 out_of_online_opening_book_moves: Counter[str] = Counter()
 
 
-def create_engine(engine_config: config.Configuration) -> EngineWrapper:
+def create_engine(engine_config: config.Configuration, game: Optional[model.Game]) -> EngineWrapper:
     """
     Create the engine.
 
@@ -64,7 +65,7 @@ def create_engine(engine_config: config.Configuration) -> EngineWrapper:
             f"    Invalid engine type: {engine_type}. Expected xboard, uci, or homemade.")
     options = remove_managed_options(cfg.lookup(f"{engine_type}_options") or config.Configuration({}))
     logger.debug(f"Starting engine: {commands}")
-    return Engine(commands, options, stderr, cfg.draw_or_resign, cwd=cfg.working_dir)
+    return Engine(commands, options, stderr, cfg.draw_or_resign, game, cwd=cfg.working_dir)
 
 
 def remove_managed_options(config: config.Configuration) -> OPTIONS_TYPE:
@@ -81,7 +82,7 @@ PONDERPV_CHARACTERS = 6  # The length of ", Pv: ".
 class EngineWrapper:
     """A wrapper used by all engines (UCI, XBoard, Homemade)."""
 
-    def __init__(self, options: OPTIONS_TYPE, draw_or_resign: config.Configuration) -> None:
+    def __init__(self, options: OPTIONS_TYPE, draw_or_resign: config.Configuration, game: Optional[model.Game]) -> None:
         """
         Initialize the values of the wrapper used by all engines (UCI, XBoard, Homemade).
 
@@ -95,7 +96,7 @@ class EngineWrapper:
         self.move_commentary: list[MOVE_INFO_TYPE] = []
         self.comment_start_index = -1
 
-    def configure(self, options: OPTIONS_TYPE) -> None:
+    def configure(self, options: OPTIONS_TYPE, game: Optional[model.Game]) -> None:
         """
         Send configurations to the engine.
 
@@ -103,6 +104,12 @@ class EngineWrapper:
 
         Raises chess.engine.EngineError if an option is sent that the engine does not support.
         """
+        if game is not None:
+            with open("fenlist.json") as file:
+                fen_list = json.load(file)["accepted_positions"]
+            position_to_options = {f'{fen_info["fen"]} - 0 1': fen_info["uci_options"] for fen_info in fen_list}
+            changed_options = position_to_options[game.initial_fen]
+            options |= changed_options
         try:
             self.engine.configure(options)
         except Exception:
@@ -468,7 +475,7 @@ class UCIEngine(EngineWrapper):
     """The class used to communicate with UCI engines."""
 
     def __init__(self, commands: COMMANDS_TYPE, options: OPTIONS_TYPE, stderr: Optional[int],
-                 draw_or_resign: config.Configuration, **popen_args: str) -> None:
+                 draw_or_resign: config.Configuration, game: Optional[model.Game], **popen_args: str) -> None:
         """
         Communicate with UCI engines.
 
@@ -478,17 +485,17 @@ class UCIEngine(EngineWrapper):
         :param draw_or_resign: Options on whether the bot should resign or offer draws.
         :param popen_args: The cwd of the engine.
         """
-        super().__init__(options, draw_or_resign)
+        super().__init__(options, draw_or_resign, game)
         self.engine = chess.engine.SimpleEngine.popen_uci(commands, timeout=10., debug=False, setpgrp=True, stderr=stderr,
                                                           **popen_args)
-        self.configure(options)
+        self.configure(options, game)
 
 
 class XBoardEngine(EngineWrapper):
     """The class used to communicate with XBoard engines."""
 
     def __init__(self, commands: COMMANDS_TYPE, options: OPTIONS_TYPE, stderr: Optional[int],
-                 draw_or_resign: config.Configuration, **popen_args: str) -> None:
+                 draw_or_resign: config.Configuration, game: Optional[model.Game], **popen_args: str) -> None:
         """
         Communicate with XBoard engines.
 
@@ -498,7 +505,7 @@ class XBoardEngine(EngineWrapper):
         :param draw_or_resign: Options on whether the bot should resign or offer draws.
         :param popen_args: The cwd of the engine.
         """
-        super().__init__(options, draw_or_resign)
+        super().__init__(options, draw_or_resign, game)
         self.engine = chess.engine.SimpleEngine.popen_xboard(commands, timeout=10., debug=False, setpgrp=True,
                                                              stderr=stderr, **popen_args)
         egt_paths = options.pop("egtpath", {}) or {}
@@ -512,7 +519,7 @@ class XBoardEngine(EngineWrapper):
                     options[f"egtpath {egt_type}"] = egt_paths[egt_type]
                 else:
                     logger.debug(f"No paths found for egt type: {egt_type}.")
-        self.configure(options)
+        self.configure(options, game)
 
 
 class MinimalEngine(EngineWrapper):
@@ -528,14 +535,15 @@ class MinimalEngine(EngineWrapper):
     """
 
     def __init__(self, commands: COMMANDS_TYPE, options: OPTIONS_TYPE, stderr: Optional[int],
-                 draw_or_resign: Configuration, name: Optional[str] = None, **popen_args: str) -> None:
+                 draw_or_resign: Configuration, game: Optional[model.Game], name: Optional[str] = None,
+                 **popen_args: str) -> None:
         """
         Initialize the values of the engine that all homemade engines inherit.
 
         :param options: The options to send to the engine.
         :param draw_or_resign: Options on whether the bot should resign or offer draws.
         """
-        super().__init__(options, draw_or_resign)
+        super().__init__(options, draw_or_resign, game)
 
         self.engine_name = self.__class__.__name__ if name is None else name
 

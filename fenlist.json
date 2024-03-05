@@ -1,0 +1,6 @@
+{"accepted_positions": [
+  {"fen": "1nbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQk", "color": "white", "uci_options": {"Contempt": "300", "DrawScore": -0.5}},
+  {"fen": "rnbqkbn1/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQq", "color": "white", "uci_options": {"Contempt": "300", "DrawScore": -0.5}},
+  {"fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/1NBQKBNR w Kkq", "color": "black", "uci_options": {"Contempt": "400", "DrawScore": 0.5}},
+  {"fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBN1 w Qkq", "color": "black", "uci_options": {"Contempt": "400", "DrawScore": 0.5}}
+]}
