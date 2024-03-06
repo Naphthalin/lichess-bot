@@ -104,7 +104,7 @@ class EngineWrapper:
         Raises chess.engine.EngineError if an option is sent that the engine does not support.
         """
         if game is not None:
-            options = game.uci_override | options
+            options |= game.uci_override
         try:
             self.engine.configure(options)
         except Exception:
