@@ -12,7 +12,6 @@ import datetime
 import time
 import random
 import math
-import json
 import test_bot.lichess
 from collections import Counter
 from collections.abc import Callable
@@ -105,11 +104,7 @@ class EngineWrapper:
         Raises chess.engine.EngineError if an option is sent that the engine does not support.
         """
         if game is not None:
-            with open("fenlist.json") as file:
-                fen_list = json.load(file)["accepted_positions"]
-            position_to_options = {f'{fen_info["fen"]} - 0 1': fen_info["uci_options"] for fen_info in fen_list}
-            changed_options = position_to_options[game.initial_fen]
-            options |= changed_options
+            options = game.uci_override | options
         try:
             self.engine.configure(options)
         except Exception:

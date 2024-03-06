@@ -3,6 +3,7 @@ import math
 from urllib.parse import urljoin
 import logging
 import datetime
+import json
 from enum import Enum
 from lib.timer import Timer, msec, seconds, sec_str, to_msec, to_seconds, years
 from lib.config import Configuration
@@ -11,6 +12,15 @@ from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
+def extract_fenlist(initial_fen, color):
+    found_position = False
+    uci_override = {}
+    with open('fenlist.json') as f:
+        for position in json.load(f)["accepted_positions"]:
+            if initial_fen.startswith(position["fen"]) and color == position["color"]:
+                found_position = True
+                uci_override = position["uci_options"]
+    return found_position, uci_override
 
 class Challenge:
     """Store information about a challenge."""
@@ -28,6 +38,8 @@ class Challenge:
         self.challenger = Player(challenge_info.get("challenger") or {})
         self.opponent = Player(challenge_info.get("destUser") or {})
         self.from_self = self.challenger.name == user_profile["username"]
+        self.initial_fen = challenge_info["initialFen"] if self.variant == "fromPosition" else "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+        self.color = challenge_info["color"]
 
     def is_supported_variant(self, challenge_cfg: Configuration) -> bool:
         """Check whether the variant is supported."""
@@ -77,6 +89,14 @@ class Challenge:
                 or max_recent_challenges is None
                 or len(recent_bot_challenges[self.challenger.name]) < max_recent_challenges)
 
+    def is_supported_fen(self, config: Configuration) -> bool:
+        """Check whether the FEN is in the list of allowed FENs."""
+        logger.info("FEN received:")
+        logger.info(self.initial_fen)
+        logger.info("color received:")
+        logger.info(self.color)
+        return extract_fenlist(self.initial_fen, self.color)[0]
+
     def decline_due_to(self, requirement_met: bool, decline_reason: str) -> str:
         """
         Get the reason lichess-bot declined an incoming challenge.
@@ -102,7 +122,8 @@ class Challenge:
                               or self.decline_due_to(self.is_supported_mode(config), "casual" if self.rated else "rated")
                               or self.decline_due_to(self.challenger.name not in config.block_list, "generic")
                               or self.decline_due_to(self.challenger.name in allowed_opponents, "generic")
-                              or self.decline_due_to(self.is_supported_recent(config, recent_bot_challenges), "later"))
+                              or self.decline_due_to(self.is_supported_recent(config, recent_bot_challenges), "later")
+                              or self.decline_due_to(self.is_supported_fen(config), "initialFen"))
 
             return not decline_reason, decline_reason
 
@@ -171,6 +192,7 @@ class Game:
         self.abort_time = Timer(abort_time)
         self.terminate_time = Timer(self.clock_initial + self.clock_increment + abort_time + seconds(60))
         self.disconnect_time = Timer(seconds(0))
+        self.uci_override = extract_fenlist(self.initial_fen, self.opponent_color)[1]
 
     def url(self) -> str:
         """Get the url of the game."""
