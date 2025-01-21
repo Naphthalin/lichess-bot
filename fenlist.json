@@ -1,0 +1,71 @@
+{"accepted_positions": [
+  {"odds": "n", "fen": "r1bqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lko_v3a.pb", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+  {"odds": "n", "fen": "rnbqkb1r/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lko_v3a.pb", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+  {"odds": "N", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/R1BQKBNR w KQkq", "color": "black", "go_options": {"nodes": 800}, "uci_options": {"DrawScore": -0.0, "WeightsFile": "lko_v3a.pb", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+  {"odds": "N", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKB1R w KQkq", "color": "black", "go_options": {"nodes": 800}, "uci_options": {"DrawScore": -0.0, "WeightsFile": "lko_v3a.pb", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+
+  {"odds": "r", "fen": "1nbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQk", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lko_v3a.pb", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+  {"odds": "R", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/1NBQKBNR w Kkq", "color": "black", "go_options": {"nodes": 800}, "uci_options": {"DrawScore": -0.0, "WeightsFile": "lko_v3a.pb", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+
+  {"odds": "qN", "fen": "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/R1BQKBNR w KQkq", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+  {"odds": "Qn", "fen": "r1bqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq", "color": "black", "go_options": {"nodes": 800}, "uci_options": {"DrawScore": -0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+
+  {"odds": "nn", "fen": "r1bqkb1r/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+  {"odds": "NN", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/R1BQKB1R w KQkq", "color": "black", "go_options": {"nodes": 800}, "uci_options": {"DrawScore": -0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+
+  {"odds": "bb", "fen": "rn1qk1nr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+  {"odds": "BB", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RN1QK1NR w KQkq", "color": "black", "go_options": {"nodes": 800}, "uci_options": {"DrawScore": -0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+
+  {"odds": "rn", "fen": "1nbqkb1r/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQk", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+  {"odds": "RN", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/1NBQKB1R w Kkq", "color": "black", "go_options": {"nodes": 800}, "uci_options": {"DrawScore": -0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+
+  {"odds": "q", "fen": "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+  {"odds": "Q", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq", "color": "black", "go_options": {"nodes": 800}, "uci_options": {"DrawScore": -0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+
+  {"odds": "rr", "fen": "1nbqkbn1/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQ", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+  {"odds": "RR", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/1NBQKBN1 w kq", "color": "black", "go_options": {"nodes": 800}, "uci_options": {"DrawScore": -0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+
+  {"odds": "bbn", "fen": "r2qk1nr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+  {"odds": "BBN", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/R2QK1NR w KQkq", "color": "black", "go_options": {"nodes": 800}, "uci_options": {"DrawScore": -0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+  {"odds": "bbn", "fen": "rn1qk2r/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+  {"odds": "BBN", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RN1QK2R w KQkq", "color": "black", "go_options": {"nodes": 800}, "uci_options": {"DrawScore": -0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+
+  {"odds": "rnn", "fen": "2bqkb1r/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQk", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+  {"odds": "RNN", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/2BQKB1R w Kkq", "color": "black", "go_options": {"nodes": 800}, "uci_options": {"DrawScore": -0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+
+  {"odds": "rbb", "fen": "1n1qk1nr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQk", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+  {"odds": "RBB", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/1N1QK1NR w Kkq", "color": "black", "go_options": {"nodes": 800}, "uci_options": {"DrawScore": -0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+
+  {"odds": "qn", "fen": "r1b1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+  {"odds": "qn", "fen": "rnb1kb1r/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+  {"odds": "QN", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/R1B1KBNR w KQkq", "color": "black", "go_options": {"nodes": 800}, "uci_options": {"DrawScore": -0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+  {"odds": "QN", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KB1R w KQkq", "color": "black", "go_options": {"nodes": 800}, "uci_options": {"DrawScore": -0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+
+  {"odds": "bbnn", "fen": "r2qk2r/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+  {"odds": "BBNN", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/R2QK2R w KQkq", "color": "black", "go_options": {"nodes": 800}, "uci_options": {"DrawScore": -0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+
+  {"odds": "qr", "fen": "1nb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQk", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+  {"odds": "QR", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/1NB1KBNR w Kkq", "color": "black", "go_options": {"nodes": 800}, "uci_options": {"DrawScore": -0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+
+  {"odds": "qnn", "fen": "r1b1kb1r/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 0.5, "TempEndgame": 0.05}},
+  {"odds": "QNN", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/R1B1KB1R w KQkq", "color": "black", "go_options": {"nodes": 800}, "uci_options": {"DrawScore": -0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 0.5, "TempEndgame": 0.05}},
+
+  {"odds": "qbb", "fen": "rn2k1nr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 0.5, "TempEndgame": 0.05}},
+  {"odds": "QBB", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RN2K1NR w KQkq", "color": "black", "go_options": {"nodes": 800}, "uci_options": {"DrawScore": -0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 0.5, "TempEndgame": 0.05}},
+
+  {"odds": "qrn", "fen": "1nb1kb1r/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQk", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 0.3, "TempEndgame": 0.05}},
+  {"odds": "QRN", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/1NB1KB1R w Kkq", "color": "black", "go_options": {"nodes": 800}, "uci_options": {"DrawScore": -0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 0.3, "TempEndgame": 0.05}},
+
+  {"odds": "qrr", "fen": "1nb1kbn1/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQ", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 0.2, "TempEndgame": 0.05}},
+  {"odds": "QRR", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/1NB1KBN1 w kq", "color": "black", "go_options": {"nodes": 800}, "uci_options": {"DrawScore": -0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 0.2, "TempEndgame": 0.05}},
+
+
+  {"odds": "bn", "fen": "r1bqk1nr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+  {"odds": "bn", "fen": "rn1qkb1r/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+  {"odds": "BN", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/R1BQK1NR w KQkq", "color": "black", "go_options": {"nodes": 800}, "uci_options": {"DrawScore": -0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+  {"odds": "BN", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RN1QKB1R w KQkq", "color": "black", "go_options": {"nodes": 800}, "uci_options": {"DrawScore": -0.0, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}}
+
+
+]}
+
+
