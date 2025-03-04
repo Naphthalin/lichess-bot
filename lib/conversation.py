@@ -1,15 +1,12 @@
 """Allows lichess-bot to send messages to the chat."""
 import logging
-import test_bot.lichess
 from lib import model
 from lib.engine_wrapper import EngineWrapper
-from lib import lichess
+from lib.lichess import Lichess
 from lib.lichess_types import GameEventType
 from collections.abc import Sequence
 from lib.timer import seconds
-from typing import Union
 MULTIPROCESSING_LIST_TYPE = Sequence[model.Challenge]
-LICHESS_TYPE = Union[lichess.Lichess, test_bot.lichess.Lichess]
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +27,7 @@ class ChatLine:
 class Conversation:
     """Enables the bot to communicate with its opponent and the spectators."""
 
-    def __init__(self, game: model.Game, engine: EngineWrapper, li: LICHESS_TYPE, version: str,
+    def __init__(self, game: model.Game, engine: EngineWrapper, li: Lichess, version: str,
                  challenge_queue: MULTIPROCESSING_LIST_TYPE) -> None:
         """
         Communication between lichess-bot and the game chats.
@@ -46,6 +43,7 @@ class Conversation:
         self.li = li
         self.version = version
         self.challengers = challenge_queue
+        self.messages: list[ChatLine] = []
 
     command_prefix = "!"
 
@@ -55,6 +53,7 @@ class Conversation:
 
         :param line: Information about the message.
         """
+        self.messages.append(line)
         logger.info(f"*** {self.game.url()} [{line.room}] {line.username}: {line.text}")
         if line.text[0] == self.command_prefix:
             self.command(line, line.text[1:].lower())
