@@ -492,7 +492,7 @@ class UCIEngine(EngineWrapper):
         :param popen_args: The cwd of the engine.
         """
         super().__init__(options, draw_or_resign)
-        self.engine = chess.engine.SimpleEngine.popen_uci(commands, timeout=10., debug=False, setpgrp=True, stderr=stderr,
+        self.engine = chess.engine.SimpleEngine.popen_uci(commands, timeout=60., debug=False, setpgrp=True, stderr=stderr,
                                                           **popen_args)
         self.configure(options, game)
 
@@ -513,7 +513,7 @@ class XBoardEngine(EngineWrapper):
         :param popen_args: The cwd of the engine.
         """
         super().__init__(options, draw_or_resign)
-        self.engine = chess.engine.SimpleEngine.popen_xboard(commands, timeout=10., debug=False, setpgrp=True,
+        self.engine = chess.engine.SimpleEngine.popen_xboard(commands, timeout=60., debug=False, setpgrp=True,
                                                              stderr=stderr, **popen_args)
         egt_paths = cast(EGTPATH_TYPE, options.pop("egtpath", {}) or {})
         protocol = cast(chess.engine.XBoardProtocol, self.engine.protocol)
@@ -756,6 +756,12 @@ def get_book_move(board: chess.Board, game: model.Game,
             try:
                 selection = polyglot_cfg.selection
                 min_weight = polyglot_cfg.min_weight
+                normalization = polyglot_cfg.normalization
+                weights = [entry.weight for entry in reader.find_all(board)]
+                scalar = (sum(weights) if normalization == "sum" and weights else
+                          max(weights) if normalization == "max" and weights else 100)
+                min_weight = min_weight * scalar / 100
+
                 if selection == "weighted_random":
                     move = reader.weighted_choice(board).move
                 elif selection == "uniform_random":

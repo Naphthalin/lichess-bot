@@ -88,9 +88,10 @@ will precede the `go` command to start thinking with `sd 5`. The other `go_comma
 - `polyglot`: Tell lichess-bot whether your bot should use an opening book. Multiple books can be specified for each chess variant.
     - `enabled`: Whether to use the book at all.
     - `book`: A nested list of books. The next indented line should list a chess variant (`standard`, `3check`, `horde`, etc.) followed on succeeding indented lines with paths to the book files. See `config.yml.default` for examples.
-    - `min_weight`: The minimum weight or quality a move must have if it is to have a chance of being selected. If a move cannot be found that has at least this weight, no move will be selected.
+    - `min_weight`: The minimum weight or quality a move must have if it is to have a chance of being selected (doesn't apply for `selection="weighted_random"`). If a move cannot be found that has at least this weight, no move will be selected. If `normalization` is `"none"` then `min_weight` takes values from 0 to 65535, but if `normalization` is `sum` or `max` then it takes values from 0 to 100.
     - `selection`: The method for selecting a move. The choices are: `"weighted_random"` where moves with a higher weight/quality have a higher probability of being chosen, `"uniform_random"` where all moves of sufficient quality have an equal chance of being chosen, and `"best_move"` where the move with the highest weight is always chosen.
     - `max_depth`: The maximum number of moves a bot plays before it stops consulting the book. If `max_depth` is 3, then the bot will stop consulting the book after its third move.
+    - `normalization`: The normalization method applied to the weights of the moves. The choices are: `"none"` where no normalization is applied, `"sum"` where the weights are normalized to sum up to 100, and `"max"` where the weights are normalized so that the maximum weight is 100.
 - `online_moves`: This section gives your bot access to various online resources for choosing moves like opening books and endgame tablebases. This can be a supplement or a replacement for chess databases stored on your computer. There are four sections that correspond to four different online databases:
     1. `chessdb_book`: Consults a [Chinese chess position database](https://www.chessdb.cn/), which also hosts a xiangqi database.
     2. `lichess_cloud_analysis`: Consults [Lichess's own position analysis database](https://lichess.org/api#operation/apiCloudEval).
@@ -192,6 +193,7 @@ will precede the `go` command to start thinking with `sd 5`. The other `go_comma
     -casual
 ```
   - `block_list`: An indented list of usernames from which the challenges are always declined. If this option is not present, then the list is considered empty.
+  - `online_block_list`: An indented list of urls from which additional block lists are retrieved. An online block list is a plain text file where each line contains a single username. If this option is not present, then the list is considered empty.
   - `allow_list`: An indented list of usernames from which challenges are exclusively accepted. A challenge from a user not on this list is declined. If this option is not present or empty, any user's challenge may be accepted.
   - `recent_bot_challenge_age`: Maximum age of a bot challenge to be considered recent in seconds
   - `max_recent_bot_challenges`: Maximum number of recent challenges that can be accepted from the same bot
@@ -246,7 +248,6 @@ will precede the `go` command to start thinking with `sd 5`. The other `go_comma
   - `opponent_max_rating`: The maximum rating of the opponent bot. The maximum rating in lichess is 4000.
   - `opponent_rating_difference`: The maximum difference between the bot's rating and the opponent bot's rating.
   - `rating_preference`: Whether the bot should prefer challenging high or low rated players, or have no preference.
-  - `opponent_allow_tos_violation`: Whether to challenge bots that violated Lichess Terms of Service. Note that even rated games against them will not affect ratings.
   - `challenge_mode`: Possible options are `casual`, `rated` and `random`.
   - `challenge_filter`: Whether and how to prevent challenging a bot after that bot declines a challenge. Options are `none`, `coarse`, and `fine`.
     - `none` does not prevent challenging a bot that declined a challenge.
@@ -255,6 +256,7 @@ will precede the `go` command to start thinking with `sd 5`. The other `go_comma
 
     The `challenge_filter` option can be useful if your matchmaking settings result in a lot of declined challenges. The bots that accept challenges will be challenged more often than those that have declined. The filter will remain until lichess-bot quits or the connection with lichess.org is reset.
   - `block_list`: An indented list of usernames of bots that will not be challenged. If this option is not present, then the list is considered empty.
+  - `online_block_list`: An indented list of urls from which additional block lists are retrieved. An online block list is a plain text file where each line contains a single username. If this option is not present, then the list is considered empty.
   - `include_challenge_block_list`: If `true`, do not send challenges to the bots listed in the `challenge: block_list`. Default is `false`.
   - `overrides`: Create variations on the matchmaking settings above for more specific circumstances. If there are any subsections under `overrides`, the settings below that will override the settings in the matchmaking section. Any settings that do not appear will be taken from the settings above. <br/> <br/>
   The overrides section must have the following:
@@ -285,7 +287,6 @@ matchmaking:
 # opponent_min_rating: 600
 # opponent_max_rating: 4000
   opponent_rating_difference: 100
-  opponent_allow_tos_violation: true
   challenge_mode: "random"
   challenge_filter: none
   overrides:
