@@ -1,6 +1,19 @@
 # Configuring lichess-bot
 There are many possible options within `config.yml` for configuring lichess-bot.
 
+## Note on daily game limits
+
+Lichess allows a bot to play 100 games against other bots in a single day (games against humans are unlimited). Several settings below can influence how quickly this game allowance is used up. These include the following:
+- `challenge:`
+  - `concurrency`: Playing multiple simultaneous games will use up games faster.
+  - `accept_bot` and `only_bot`: Games against other bots use up the allotted games.
+  - `min_increment`, `min_base`, and `time_controls`: Shorter games use up the allotted games faster.
+  - `recent_bot_challenge_age`, `max_recent_bot_challenges`, `max_simultaneous_games_per_user`: To prevent a single bot from using up all your bot's games.
+- `matchmaking:`
+  - `allow_during_games`: Starting simultaneous games uses up games faster.
+  - `challenge_timeout`: Longer timeouts between games will spread out games over a day.
+  - `challenge_initial_time` and `challenge_increment`: Shorter games use up the allotted games faster.
+
 ## Engine options
 - `interpreter`: Specify whether your engine requires an interpreter to run (e.g. `java`, `python`).
 - `interpreter_options`: A list of options passed to the interpreter (e.g. `-jar` for `java`).
@@ -88,9 +101,10 @@ will precede the `go` command to start thinking with `sd 5`. The other `go_comma
 - `polyglot`: Tell lichess-bot whether your bot should use an opening book. Multiple books can be specified for each chess variant.
     - `enabled`: Whether to use the book at all.
     - `book`: A nested list of books. The next indented line should list a chess variant (`standard`, `3check`, `horde`, etc.) followed on succeeding indented lines with paths to the book files. See `config.yml.default` for examples.
-    - `min_weight`: The minimum weight or quality a move must have if it is to have a chance of being selected. If a move cannot be found that has at least this weight, no move will be selected.
+    - `min_weight`: The minimum weight or quality a move must have if it is to have a chance of being selected (doesn't apply for `selection="weighted_random"`). If a move cannot be found that has at least this weight, no move will be selected. If `normalization` is `"none"` then `min_weight` takes values from 0 to 65535, but if `normalization` is `sum` or `max` then it takes values from 0 to 100.
     - `selection`: The method for selecting a move. The choices are: `"weighted_random"` where moves with a higher weight/quality have a higher probability of being chosen, `"uniform_random"` where all moves of sufficient quality have an equal chance of being chosen, and `"best_move"` where the move with the highest weight is always chosen.
     - `max_depth`: The maximum number of moves a bot plays before it stops consulting the book. If `max_depth` is 3, then the bot will stop consulting the book after its third move.
+    - `normalization`: The normalization method applied to the weights of the moves. The choices are: `"none"` where no normalization is applied, `"sum"` where the weights are normalized to sum up to 100, and `"max"` where the weights are normalized so that the maximum weight is 100.
 - `online_moves`: This section gives your bot access to various online resources for choosing moves like opening books and endgame tablebases. This can be a supplement or a replacement for chess databases stored on your computer. There are four sections that correspond to four different online databases:
     1. `chessdb_book`: Consults a [Chinese chess position database](https://www.chessdb.cn/), which also hosts a xiangqi database.
     2. `lichess_cloud_analysis`: Consults [Lichess's own position analysis database](https://lichess.org/api#operation/apiCloudEval).
@@ -102,6 +116,7 @@ will precede the `go` command to start thinking with `sd 5`. The other `go_comma
     - Configurations common to all:
         - `enabled`: Whether to use the database at all.
         - `min_time`: The minimum time in seconds on the game clock necessary to allow the online database to be consulted.
+        - `max_time`: The maximum starting game time in seconds on the game clock necessary to allow the online database to be consulted.
         - `move_quality`: Choice of `"all"` (`chessdb_book` only), `"good"` (all except `online_egtb`), `"best"`, or `"suggest"` (`online_egtb` only).
             - `all`: Choose a random move from all legal moves.
             - `best`: Choose only the highest scoring move.
@@ -192,6 +207,7 @@ will precede the `go` command to start thinking with `sd 5`. The other `go_comma
     -casual
 ```
   - `block_list`: An indented list of usernames from which the challenges are always declined. If this option is not present, then the list is considered empty.
+  - `online_block_list`: An indented list of urls from which additional block lists are retrieved. An online block list is a plain text file where each line contains a single username. If this option is not present, then the list is considered empty.
   - `allow_list`: An indented list of usernames from which challenges are exclusively accepted. A challenge from a user not on this list is declined. If this option is not present or empty, any user's challenge may be accepted.
   - `recent_bot_challenge_age`: Maximum age of a bot challenge to be considered recent in seconds
   - `max_recent_bot_challenges`: Maximum number of recent challenges that can be accepted from the same bot
@@ -239,6 +255,9 @@ will precede the `go` command to start thinking with `sd 5`. The other `go_comma
   - `allow_during_games`: Whether to issue new challenges while the bot is already playing games. If true, no more than 10 minutes will pass between matchmaking challenges.
   - `challenge_variant`: The variant for the challenges. If set to `random` a variant from the ones enabled in `challenge.variants` will be chosen at random.
   - `challenge_timeout`: The time (in minutes) the bot has to be idle before it creates a challenge.
+
+  Bots are limited to playing 100 games against other bots per day, so setting `challenge_timeout` to a small value will result in this limit being reached quickly. There is no limit to the number of games a bot can play against humans.
+
   - `challenge_initial_time`: A list of initial times (in seconds and to be chosen at random) for the challenges.
   - `challenge_increment`: A list of increments (in seconds and to be chosen at random) for the challenges.
   - `challenge_days`: A list of number of days for a correspondence challenge (to be chosen at random).
@@ -246,7 +265,6 @@ will precede the `go` command to start thinking with `sd 5`. The other `go_comma
   - `opponent_max_rating`: The maximum rating of the opponent bot. The maximum rating in lichess is 4000.
   - `opponent_rating_difference`: The maximum difference between the bot's rating and the opponent bot's rating.
   - `rating_preference`: Whether the bot should prefer challenging high or low rated players, or have no preference.
-  - `opponent_allow_tos_violation`: Whether to challenge bots that violated Lichess Terms of Service. Note that even rated games against them will not affect ratings.
   - `challenge_mode`: Possible options are `casual`, `rated` and `random`.
   - `challenge_filter`: Whether and how to prevent challenging a bot after that bot declines a challenge. Options are `none`, `coarse`, and `fine`.
     - `none` does not prevent challenging a bot that declined a challenge.
@@ -255,6 +273,7 @@ will precede the `go` command to start thinking with `sd 5`. The other `go_comma
 
     The `challenge_filter` option can be useful if your matchmaking settings result in a lot of declined challenges. The bots that accept challenges will be challenged more often than those that have declined. The filter will remain until lichess-bot quits or the connection with lichess.org is reset.
   - `block_list`: An indented list of usernames of bots that will not be challenged. If this option is not present, then the list is considered empty.
+  - `online_block_list`: An indented list of urls from which additional block lists are retrieved. An online block list is a plain text file where each line contains a single username. If this option is not present, then the list is considered empty.
   - `include_challenge_block_list`: If `true`, do not send challenges to the bots listed in the `challenge: block_list`. Default is `false`.
   - `overrides`: Create variations on the matchmaking settings above for more specific circumstances. If there are any subsections under `overrides`, the settings below that will override the settings in the matchmaking section. Any settings that do not appear will be taken from the settings above. <br/> <br/>
   The overrides section must have the following:
@@ -285,7 +304,6 @@ matchmaking:
 # opponent_min_rating: 600
 # opponent_max_rating: 4000
   opponent_rating_difference: 100
-  opponent_allow_tos_violation: true
   challenge_mode: "random"
   challenge_filter: none
   overrides:

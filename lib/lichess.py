@@ -45,22 +45,75 @@ logger = logging.getLogger(__name__)
 MAX_CHAT_MESSAGE_LEN = 140  # The maximum characters in a chat message.
 
 
+class Stop:
+    """Class to stop the bot."""
+
+    def __init__(self) -> None:
+        """Initialize the Stop class."""
+        self.terminated = False
+        self.force_quit = False
+        self.restart = True
+
+
+stop = Stop()
+
+
 class RateLimitedError(RuntimeError):
     """Exception raised when we are rate limited (status code 429)."""
+
+    def __init__(self, message: str, timeout: datetime.timedelta) -> None:
+        """Create a rate-limited error with the time left until the rate limit expires."""
+        super().__init__(message)
+        self.timeout = timeout
 
 
 def is_new_rate_limit(response: requests.models.Response) -> bool:
     """Check if the status code is 429, which means that we are rate limited."""
     return response.status_code == 429
 
+def is_daily_game_rate_limit(response: requests.models.Response, rate_limit_status_code: int) -> bool:
+    """Check if response to challenge is a rate limit, either of the bot or the opponent."""
+    if response.status_code != rate_limit_status_code:
+        return False
+
+    try:
+        body = response.json()
+        return "error" in body and body.get("ratelimit", {}).get("key", "") == "bot.vsBot.day"
+    except requests.exceptions.JSONDecodeError:
+        return False
+
+
+def is_opponent_rate_limit(response: requests.models.Response) -> bool:
+    """Check if response to a challenge is 400, which means opponent is rate limited."""
+    return is_daily_game_rate_limit(response, 400)
+
+
+def is_bot_rate_limit(response: requests.models.Response) -> bool:
+    """Check if response to a challenge is 429, which means the bot is rate limited."""
+    return is_daily_game_rate_limit(response, 429)
+
+
+def get_challenge_timeout(challenge_response: ChallengeType) -> Optional[datetime.timedelta]:
+    """Return the timeout in a challenge response if the bot or the opponent cannot play another game."""
+    rate_limit = challenge_response.get("ratelimit", {})
+    key = rate_limit.get("key", "")
+    if key == "bot.vsBot.day":
+        return seconds(float(rate_limit["seconds"]))
+    return None
+
 
 def is_final(exception: Exception) -> bool:
     """If `is_final` returns True then we won't retry."""
-    return isinstance(exception, HTTPError) and exception.response is not None and exception.response.status_code < 500
+    return (isinstance(exception, HTTPError) and exception.response is not None and exception.response.status_code < 500
+            or stop.terminated or stop.force_quit)
 
 
 def backoff_handler(details: BackoffDetails) -> None:
     """Log exceptions inside functions with the backoff decorator."""
+    args = details["args"]
+    kwargs = details["kwargs"]
+    if "token_test" in args:
+        kwargs["data"] = "<token redacted>"
     logger.debug("Backing off {wait:0.1f} seconds after {tries} tries "
                  "calling function {target} with args {args} and kwargs {kwargs}".format(**details))
     logger.debug(f"Exception: {traceback.format_exc()}")
@@ -95,13 +148,14 @@ class Lichess:
 
         # Confirm that the OAuth token has the proper permission to play on lichess
         token_response = cast(TOKEN_TESTS_TYPE, self.api_post("token_test", data=token))
-        token_info = token_response[token]
+        token_info = token_response.get(token)
 
         if not token_info:
-            raise RuntimeError("Token in config file is not recognized by lichess. "
-                               "Please check that it was copied correctly into your configuration file.")
+            raise RuntimeError("There was an error in retrieving information about the bot's token. "
+                               "Please check that it was copied correctly into your configuration file "
+                               "and try again.")
 
-        scopes = token_info["scopes"]
+        scopes = token_info.get("scopes", "")
         if "bot:play" not in scopes.split(","):
             raise RuntimeError("Please use an API access token for your bot that "
                                'has the scope "Play games with the bot API (bot:play)". '
@@ -216,6 +270,9 @@ class Lichess:
         url = urljoin(self.baseUrl, path_template.format(*template_args))
         response = self.session.post(url, data=data, headers=headers, params=params, json=payload, timeout=2)
 
+        if endpoint_name == "challenge":
+            return self.handle_challenge(response)
+
         if is_new_rate_limit(response):
             self.set_rate_limit_delay(path_template, seconds(60))
 
@@ -234,9 +291,25 @@ class Lichess:
         """
         path_template = ENDPOINTS[endpoint_name]
         if self.is_rate_limited(path_template):
-            raise RateLimitedError(f"{path_template} is rate-limited. "
-                                   f"Will retry in {sec_str(self.rate_limit_time_left(path_template))} seconds.")
+            time_left = self.rate_limit_time_left(path_template)
+            raise RateLimitedError(
+                f"{path_template} is rate-limited. Will retry in {sec_str(time_left)} seconds.", time_left)
         return path_template
+
+    def handle_challenge(self, response: requests.models.Response) -> ChallengeType:
+        """Handle the response to a challenge and, if necessary, the daily game timeout."""
+        bot_is_rate_limited = is_bot_rate_limit(response)
+        opponent_is_rate_limited = is_opponent_rate_limit(response)
+        challenge_response: ChallengeType = response.json()
+        if bot_is_rate_limited or opponent_is_rate_limited:
+            delay = cast(datetime.timedelta, get_challenge_timeout(challenge_response))
+            if bot_is_rate_limited:
+                self.set_rate_limit_delay(ENDPOINTS["challenge"], delay)
+            challenge_response["bot_is_rate_limited"] = bot_is_rate_limited
+            challenge_response["opponent_is_rate_limited"] = opponent_is_rate_limited
+            challenge_response["rate_limit_timeout"] = delay
+
+        return challenge_response
 
     def set_rate_limit_delay(self, path_template: str, delay_time: datetime.timedelta) -> None:
         """

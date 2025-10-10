@@ -4,6 +4,7 @@ from chess.engine import PovWdl, PovScore, PlayResult, Limit, Opponent
 from chess import Move, Board
 from queue import Queue
 import logging
+import datetime
 from enum import Enum
 from types import TracebackType
 
@@ -56,8 +57,6 @@ class UserProfileType(TypedDict, total=False):
     username: str
     perfs: dict[str, PerfType]
     createdAt: int
-    disabled: bool
-    tosViolation: bool
     profile: ProfileType
     seenAt: int
     patron: int
@@ -190,6 +189,11 @@ class ChallengeType(TypedDict, total=False):
     declineReason: str
     declineReasonKey: str
     initialFen: str
+    error: str
+    ratelimit: dict[str, Union[str, int]]
+    bot_is_rate_limited: bool
+    opponent_is_rate_limited: bool
+    rate_limit_timeout: datetime.timedelta
 
 
 class EventType(TypedDict, total=False):
@@ -251,7 +255,7 @@ class GameEventType(TypedDict, total=False):
 
 
 CONTROL_QUEUE_TYPE = Queue[EventType]
-PGN_QUEUE_TYPE = Queue[EventType]
+PGN_QUEUE_TYPE = Queue[Optional[EventType]]
 
 
 class PublicDataType(TypedDict, total=False):
