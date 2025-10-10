@@ -624,8 +624,8 @@ def get_homemade_engine(name: str) -> type[MinimalEngine]:
     :param name: The name of the homemade engine.
     :return: The engine with this name.
     """
-    import homemade
-    from test_bot import homemade as test_homemade
+    import homemade  # noqa: PLC0415
+    from test_bot import homemade as test_homemade  # noqa: PLC0415
     engine: type[MinimalEngine]
     if name.endswith(test_suffix):  # Test only.
         engine = getattr(test_homemade, name.removesuffix(test_suffix))
@@ -837,7 +837,8 @@ def get_chessdb_move(li: lichess.Lichess, board: chess.Board, game: model.Game,
     use_chessdb = chessdb_cfg.enabled
     time_left = msec(game.state[wbtime(board)])
     min_time = seconds(chessdb_cfg.min_time)
-    if not use_chessdb or time_left < min_time or board.uci_variant != "chess":
+    max_time = seconds(chessdb_cfg.max_time)
+    if not use_chessdb or time_left < min_time or game.clock_initial > max_time or board.uci_variant != "chess":
         return None, {}
 
     move = None
@@ -874,8 +875,9 @@ def get_lichess_cloud_move(li: lichess.Lichess, board: chess.Board, game: model.
     side = wbtime(board)
     time_left = msec(game.state[side])
     min_time = seconds(lichess_cloud_cfg.min_time)
+    max_time = seconds(lichess_cloud_cfg.max_time)
     use_lichess_cloud = lichess_cloud_cfg.enabled
-    if not use_lichess_cloud or time_left < min_time:
+    if not use_lichess_cloud or time_left < min_time or game.clock_initial > max_time:
         return None, {}
 
     move = None
@@ -927,8 +929,10 @@ def get_opening_explorer_move(li: lichess.Lichess, board: chess.Board, game: mod
     side = wbtime(board)
     time_left = msec(game.state[side])
     min_time = seconds(opening_explorer_cfg.min_time)
+    max_time = seconds(opening_explorer_cfg.max_time)
     source = opening_explorer_cfg.source
-    if not opening_explorer_cfg.enabled or time_left < min_time or source == "master" and board.uci_variant != "chess":
+    if (not opening_explorer_cfg.enabled or time_left < min_time or game.clock_initial > max_time or source == "master"
+            and board.uci_variant != "chess"):
         return None, {}
 
     move = None
@@ -982,9 +986,11 @@ def get_online_egtb_move(li: lichess.Lichess, board: chess.Board, game: model.Ga
     pieces = chess.popcount(board.occupied)
     source = online_egtb_cfg.source
     minimum_time = seconds(online_egtb_cfg.min_time)
+    maximum_time = seconds(online_egtb_cfg.max_time)
     time_left = game.state[wbtime(board)]
     if (not use_online_egtb
             or msec(time_left) < minimum_time
+            or game.clock_initial > maximum_time
             or board.uci_variant not in ["chess", "antichess", "atomic"]
             and source == "lichess"
             or board.uci_variant != "chess"

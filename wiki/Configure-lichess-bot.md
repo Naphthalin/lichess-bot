@@ -1,6 +1,19 @@
 # Configuring lichess-bot
 There are many possible options within `config.yml` for configuring lichess-bot.
 
+## Note on daily game limits
+
+Lichess allows a bot to play 100 games against other bots in a single day (games against humans are unlimited). Several settings below can influence how quickly this game allowance is used up. These include the following:
+- `challenge:`
+  - `concurrency`: Playing multiple simultaneous games will use up games faster.
+  - `accept_bot` and `only_bot`: Games against other bots use up the allotted games.
+  - `min_increment`, `min_base`, and `time_controls`: Shorter games use up the allotted games faster.
+  - `recent_bot_challenge_age`, `max_recent_bot_challenges`, `max_simultaneous_games_per_user`: To prevent a single bot from using up all your bot's games.
+- `matchmaking:`
+  - `allow_during_games`: Starting simultaneous games uses up games faster.
+  - `challenge_timeout`: Longer timeouts between games will spread out games over a day.
+  - `challenge_initial_time` and `challenge_increment`: Shorter games use up the allotted games faster.
+
 ## Engine options
 - `interpreter`: Specify whether your engine requires an interpreter to run (e.g. `java`, `python`).
 - `interpreter_options`: A list of options passed to the interpreter (e.g. `-jar` for `java`).
@@ -103,6 +116,7 @@ will precede the `go` command to start thinking with `sd 5`. The other `go_comma
     - Configurations common to all:
         - `enabled`: Whether to use the database at all.
         - `min_time`: The minimum time in seconds on the game clock necessary to allow the online database to be consulted.
+        - `max_time`: The maximum starting game time in seconds on the game clock necessary to allow the online database to be consulted.
         - `move_quality`: Choice of `"all"` (`chessdb_book` only), `"good"` (all except `online_egtb`), `"best"`, or `"suggest"` (`online_egtb` only).
             - `all`: Choose a random move from all legal moves.
             - `best`: Choose only the highest scoring move.
@@ -241,6 +255,9 @@ will precede the `go` command to start thinking with `sd 5`. The other `go_comma
   - `allow_during_games`: Whether to issue new challenges while the bot is already playing games. If true, no more than 10 minutes will pass between matchmaking challenges.
   - `challenge_variant`: The variant for the challenges. If set to `random` a variant from the ones enabled in `challenge.variants` will be chosen at random.
   - `challenge_timeout`: The time (in minutes) the bot has to be idle before it creates a challenge.
+
+  Bots are limited to playing 100 games against other bots per day, so setting `challenge_timeout` to a small value will result in this limit being reached quickly. There is no limit to the number of games a bot can play against humans.
+
   - `challenge_initial_time`: A list of initial times (in seconds and to be chosen at random) for the challenges.
   - `challenge_increment`: A list of increments (in seconds and to be chosen at random) for the challenges.
   - `challenge_days`: A list of number of days for a correspondence challenge (to be chosen at random).

@@ -8,6 +8,7 @@ import requests
 from abc import ABCMeta
 from typing import Any, Union, ItemsView, Callable
 from lib.lichess_types import CONFIG_DICT_TYPE, FilterType
+from lib.timer import minutes, days
 
 logger = logging.getLogger(__name__)
 
@@ -169,20 +170,24 @@ def insert_default_values(CONFIG: CONFIG_DICT_TYPE) -> None:
     set_config_default(CONFIG, "engine", "online_moves", "online_egtb", key="enabled", default=False)
     set_config_default(CONFIG, "engine", "online_moves", "online_egtb", key="source", default="lichess")
     set_config_default(CONFIG, "engine", "online_moves", "online_egtb", key="min_time", default=20)
+    set_config_default(CONFIG, "engine", "online_moves", "online_egtb", key="max_time", default=10800)
     set_config_default(CONFIG, "engine", "online_moves", "online_egtb", key="max_pieces", default=7)
     set_config_default(CONFIG, "engine", "online_moves", "online_egtb", key="move_quality", default="best")
     set_config_default(CONFIG, "engine", "online_moves", "chessdb_book", key="enabled", default=False)
     set_config_default(CONFIG, "engine", "online_moves", "chessdb_book", key="min_time", default=20)
+    set_config_default(CONFIG, "engine", "online_moves", "chessdb_book", key="max_time", default=10800)
     set_config_default(CONFIG, "engine", "online_moves", "chessdb_book", key="move_quality", default="good")
     set_config_default(CONFIG, "engine", "online_moves", "chessdb_book", key="min_depth", default=20)
     set_config_default(CONFIG, "engine", "online_moves", "lichess_cloud_analysis", key="enabled", default=False)
     set_config_default(CONFIG, "engine", "online_moves", "lichess_cloud_analysis", key="min_time", default=20)
+    set_config_default(CONFIG, "engine", "online_moves", "lichess_cloud_analysis", key="max_time", default=10800)
     set_config_default(CONFIG, "engine", "online_moves", "lichess_cloud_analysis", key="move_quality", default="best")
     set_config_default(CONFIG, "engine", "online_moves", "lichess_cloud_analysis", key="min_depth", default=20)
     set_config_default(CONFIG, "engine", "online_moves", "lichess_cloud_analysis", key="min_knodes", default=0)
     set_config_default(CONFIG, "engine", "online_moves", "lichess_cloud_analysis", key="max_score_difference", default=50)
     set_config_default(CONFIG, "engine", "online_moves", "lichess_opening_explorer", key="enabled", default=False)
     set_config_default(CONFIG, "engine", "online_moves", "lichess_opening_explorer", key="min_time", default=20)
+    set_config_default(CONFIG, "engine", "online_moves", "lichess_opening_explorer", key="max_time", default=10800)
     set_config_default(CONFIG, "engine", "online_moves", "lichess_opening_explorer", key="source", default="masters")
     set_config_default(CONFIG, "engine", "online_moves", "lichess_opening_explorer", key="player_name", default="")
     set_config_default(CONFIG, "engine", "online_moves", "lichess_opening_explorer", key="sort", default="winrate")
@@ -338,6 +343,11 @@ def validate_config(CONFIG: CONFIG_DICT_TYPE) -> None:
                     "no challenges being created.")
         config_warn(matchmaking.get("opponent_rating_difference", 0) >= 0,
                     "matchmaking.opponent_rating_difference < 0 will result in no challenges being created.")
+        max_games_per_day = 100
+        game_timeout = minutes(matchmaking["challenge_timeout"])
+        config_warn(game_timeout*max_games_per_day >= days(1),
+                    f"A bot is only allowed to play {max_games_per_day} games per day against other bots. Please check your "
+                    "config file to make sure your bot won't use up all its allotted games quickly.")
 
     pgn_directory = CONFIG["pgn_directory"]
     in_docker = os.environ.get("LICHESS_BOT_DOCKER")

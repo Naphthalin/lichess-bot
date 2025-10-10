@@ -4,40 +4,16 @@ import logging
 import datetime
 import contextlib
 from lib import model
-from lib.timer import Timer, seconds, minutes, days, years
+from lib.timer import Timer, days, seconds, minutes, years
 from collections import defaultdict
 from collections.abc import Sequence
-from lib.lichess import Lichess
+from lib.lichess import Lichess, RateLimitedError
 from lib.config import Configuration
-from typing import Optional, Union
-from lib.lichess_types import UserProfileType, PerfType, EventType, FilterType
+from typing import Optional, Union, cast
+from lib.lichess_types import UserProfileType, PerfType, EventType, FilterType, ChallengeType
 MULTIPROCESSING_LIST_TYPE = Sequence[model.Challenge]
-DAILY_TIMERS_TYPE = list[Timer]
 
 logger = logging.getLogger(__name__)
-
-daily_challenges_file_name = "daily_challenge_times.txt"
-timestamp_format = "%Y-%m-%d %H:%M:%S\n"
-
-
-def read_daily_challenges() -> DAILY_TIMERS_TYPE:
-    """Read the challenges we have created in the past 24 hours from a text file."""
-    timers: DAILY_TIMERS_TYPE = []
-    try:
-        with open(daily_challenges_file_name) as file:
-            for line in file:
-                timers.append(Timer(days(1), datetime.datetime.strptime(line, timestamp_format)))
-    except FileNotFoundError:
-        pass
-
-    return [timer for timer in timers if not timer.is_expired()]
-
-
-def write_daily_challenges(daily_challenges: DAILY_TIMERS_TYPE) -> None:
-    """Write the challenges we have created in the past 24 hours to a text file."""
-    with open(daily_challenges_file_name, "w") as file:
-        for timer in daily_challenges:
-            file.write(timer.starting_timestamp(timestamp_format))
 
 
 class Matchmaking:
@@ -53,11 +29,11 @@ class Matchmaking:
         self.last_game_ended_delay = Timer(minutes(self.matchmaking_cfg.challenge_timeout))
         self.last_user_profile_update_time = Timer(minutes(5))
         self.min_wait_time = seconds(60)  # Wait before new challenge to avoid api rate limits.
+        self.rate_limit_timer = Timer()
 
         # Maximum time between challenges, even if there are active games
         self.max_wait_time = minutes(10) if self.matchmaking_cfg.allow_during_games else years(10)
         self.challenge_id = ""
-        self.daily_challenges = read_daily_challenges()
 
         # (opponent name, game aspect) --> other bot is likely to accept challenge
         # game aspect is the one the challenged bot objects to and is one of:
@@ -65,7 +41,7 @@ class Matchmaking:
         #   - variant (standard, horde, etc.)
         #   - casual/rated
         #   - empty string (if no other reason is given or self.filter_type is COARSE)
-        self.challenge_type_acceptable: defaultdict[tuple[str, str], bool] = defaultdict(lambda: True)
+        self.challenge_type_acceptable: defaultdict[tuple[str, str], Timer] = defaultdict(Timer)
         self.challenge_filter = self.matchmaking_cfg.challenge_filter
 
         for name in self.matchmaking_cfg.block_list:
@@ -74,7 +50,7 @@ class Matchmaking:
     def should_create_challenge(self) -> bool:
         """Whether we should create a challenge."""
         matchmaking_enabled = self.matchmaking_cfg.allow_matchmaking
-        time_has_passed = self.last_game_ended_delay.is_expired()
+        time_has_passed = self.last_game_ended_delay.is_expired() and self.rate_limit_timer.is_expired()
         challenge_expired = self.last_challenge_created_delay.is_expired() and self.challenge_id
         min_wait_time_passed = self.last_challenge_created_delay.time_since_reset() > self.min_wait_time
         if challenge_expired:
@@ -100,35 +76,33 @@ class Matchmaking:
             return ""
 
         try:
-            self.update_daily_challenge_record()
             self.last_challenge_created_delay.reset()
             response = self.li.challenge(username, params)
             challenge_id = response.get("id", "")
             if not challenge_id:
-                logger.error(response)
-                self.add_to_block_list(username)
-                self.show_earliest_challenge_time()
+                self.handle_challenge_error_response(response, username)
             return challenge_id
+        except RateLimitedError as e:
+            logger.warning(e)
+            self.rate_limit_timer = Timer(e.timeout)
         except Exception as e:
-            logger.warning("Could not create challenge")
             logger.debug(e, exc_info=e)
-            self.show_earliest_challenge_time()
-            return ""
 
-    def update_daily_challenge_record(self) -> None:
-        """
-        Record timestamp of latest challenge and update minimum wait time.
+        logger.warning("Could not create challenge")
+        self.show_earliest_challenge_time()
+        return ""
 
-        As the number of challenges in a day increase, the minimum wait time between challenges increases.
-        0   -  49 challenges --> 1 minute
-        50  -  99 challenges --> 2 minutes
-        100 - 149 challenges --> 3 minutes
-        etc.
-        """
-        self.daily_challenges = [timer for timer in self.daily_challenges if not timer.is_expired()]
-        self.daily_challenges.append(Timer(days(1)))
-        self.min_wait_time = seconds(60) * ((len(self.daily_challenges) // 50) + 1)
-        write_daily_challenges(self.daily_challenges)
+    def handle_challenge_error_response(self, response: ChallengeType, username: str) -> None:
+        """If a challenge fails, print the error and adjust the challenge requirements in response."""
+        logger.error(response)
+        if response.get("bot_is_rate_limited"):
+            timeout = cast(datetime.timedelta, response.get("rate_limit_timeout"))
+            self.rate_limit_timer = Timer(timeout)
+        elif response.get("opponent_is_rate_limited"):
+            self.add_challenge_filter(username, "", response.get("rate_limit_timeout"))
+        else:
+            self.add_challenge_filter(username, "")
+        self.show_earliest_challenge_time()
 
     def perf(self) -> dict[str, PerfType]:
         """Get the bot's rating in every variant. Bullet, blitz, rapid etc. are considered different variants."""
@@ -281,30 +255,29 @@ class Matchmaking:
         if self.matchmaking_cfg.allow_matchmaking:
             postgame_timeout = self.last_game_ended_delay.time_until_expiration()
             time_to_next_challenge = self.min_wait_time - self.last_challenge_created_delay.time_since_reset()
-            time_left = max(postgame_timeout, time_to_next_challenge)
+            rate_limit_delay = self.rate_limit_timer.time_until_expiration()
+            time_left = max(postgame_timeout, time_to_next_challenge, rate_limit_delay)
             earliest_challenge_time = datetime.datetime.now() + time_left
-            challenges = "challenge" + ("" if len(self.daily_challenges) == 1 else "s")
-            logger.info(f"Next challenge will be created after {earliest_challenge_time.strftime('%X')} "
-                        f"({len(self.daily_challenges)} {challenges} in last 24 hours)")
+            logger.info(f"Next challenge will be created after {earliest_challenge_time.strftime('%c')}")
 
     def add_to_block_list(self, username: str) -> None:
         """Add a bot to the blocklist."""
-        self.add_challenge_filter(username, "")
+        self.add_challenge_filter(username, "", years(10))
 
     def in_block_list(self, username: str) -> bool:
         """Check if an opponent is in the block list to prevent future challenges."""
         return not self.should_accept_challenge(username, "")
 
-    def add_challenge_filter(self, username: str, game_aspect: str) -> None:
+    def add_challenge_filter(self, username: str, game_aspect: str, timeout: Union[datetime.timedelta, None] = None) -> None:
         """
-        Prevent creating another challenge when an opponent has decline a challenge.
+        Prevent creating another challenge for a timeout when an opponent has declined a challenge.
 
         :param username: The name of the opponent.
-        :param game_aspect: The aspect of a game (time control, chess variant, etc.)
-        that caused the opponent to decline a challenge. If the parameter is empty,
-        that is equivalent to adding the opponent to the block list.
+        :param game_aspect: The aspect of a game (time control, chess variant, etc.) that caused the opponent to decline a
+        challenge. If the parameter is empty, that is equivalent to adding the opponent to the block list.
+        :param timeout: The amount of time to not challenge an opponent. If None, the default is a day.
         """
-        self.challenge_type_acceptable[(username, game_aspect)] = False
+        self.challenge_type_acceptable[(username, game_aspect)] = Timer(timeout or days(1))
 
     def should_accept_challenge(self, username: str, game_aspect: str) -> bool:
         """
@@ -314,7 +287,7 @@ class Matchmaking:
         :param game_aspect: A category of the challenge type (time control, chess variant, etc.) to test for acceptance.
         If game_aspect is empty, this is equivalent to checking if the opponent is in the block list.
         """
-        return self.challenge_type_acceptable[(username, game_aspect)]
+        return self.challenge_type_acceptable[(username, game_aspect)].is_expired()
 
     def accepted_challenge(self, event: EventType) -> None:
         """
@@ -355,7 +328,7 @@ class Matchmaking:
             logger.warning(f"Unknown decline reason received: {reason_key}")
         game_problem = decline_details.get(reason_key, "") if self.challenge_filter == FilterType.FINE else ""
         self.add_challenge_filter(opponent.name, game_problem)
-        logger.info(f"Will not challenge {opponent} to another {game_problem}".strip() + " game.")
+        logger.info(f"Will not challenge {opponent} to another {game_problem}".strip() + " game today.")
 
         self.show_earliest_challenge_time()
 
