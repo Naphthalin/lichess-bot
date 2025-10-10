@@ -159,7 +159,11 @@ class EngineWrapper:
         lichess_bot_tbs = engine_cfg.lichess_bot_tbs
 
         best_move: MOVE
-        best_move = get_book_move(board, game, polyglot_cfg)
+        
+        if game.selected_gambit == "" and board.ply() < 8:
+            logger.info("No gambit selected, trying to wait for opponent")
+        
+        best_move = get_book_move(board, game, polyglot_cfg, game.selected_gambit)
 
         if best_move.move is None:
             best_move = get_egtb_move(board,
@@ -733,7 +737,7 @@ def check_for_draw_offer(game: model.Game) -> bool:
 
 
 def get_book_move(board: chess.Board, game: model.Game,
-                  polyglot_cfg: Configuration) -> chess.engine.PlayResult:
+                  polyglot_cfg: Configuration, selected_gambit: str) -> chess.engine.PlayResult:
     """Get a move from an opening book."""
     no_book_move = chess.engine.PlayResult(None, None)
     use_book = polyglot_cfg.enabled
@@ -748,8 +752,13 @@ def get_book_move(board: chess.Board, game: model.Game,
 
     change_value_to_list(polyglot_cfg.config, "book", key=variant)
     books = polyglot_cfg.book.lookup(variant)
-
-    for book in books:
+    
+    side_to_move = ("white" if board.turn == chess.WHITE else "black")
+    
+    for book in sorted(books,key=lambda _: random.random()):
+        if not (selected_gambit in book.lower() and book.lower().split("/")[-1].startswith(side_to_move)):
+            # logger.info("Skipping " + book + " because not matching the selected opening.")
+            continue
         with chess.polyglot.open_reader(book) as reader:
             try:
                 selection = polyglot_cfg.selection

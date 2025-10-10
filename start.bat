@@ -1,0 +1,1 @@
+..\lichess-bot\lichess-bot\Scripts\python.exe lichess-bot.py

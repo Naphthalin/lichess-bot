@@ -180,6 +180,7 @@ class Game:
         self.abort_time = Timer(abort_time)
         self.terminate_time = Timer(self.clock_initial + self.clock_increment + abort_time + seconds(60))
         self.disconnect_time = Timer(seconds(0))
+        self.selected_gambit = ""
 
     def url(self) -> str:
         """Get the url of the game."""

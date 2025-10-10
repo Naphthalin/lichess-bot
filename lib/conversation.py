@@ -70,7 +70,13 @@ class Conversation:
         if cmd in ("commands", "help"):
             self.send_reply(line,
                             "Supported commands: !wait (wait a minute for my first move), !name, "
-                            "!eval (or any text starting with !eval), !queue")
+                            "!eval (or any text starting with !eval), !queue, !select <gambit>, !gambits")
+        elif cmd.startswith("select") and (line.username == "Naphthalin" or not (from_self or line.room == "spectator")):
+            self.game.selected_gambit = cmd.replace("select","").strip(" <>")
+            self.send_reply(line, "Opening selected: " + self.game.selected_gambit)
+        elif cmd == "gambits":
+            self.send_reply(line, "Possible gambits: blackmardiemer danish evans grob halloween kga reti scotch slav smithmorra staunton vienna (as white)")
+            self.send_reply(line, "albin benko borg budapest elephant englund froms latvian reversemorra rousseau stafford (as black).")
         elif cmd == "wait" and self.game.is_abortable():
             self.game.ping(seconds(60), seconds(120), seconds(120))
             self.send_reply(line, "Waiting 60 seconds...")
