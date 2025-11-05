@@ -1,4 +1,6 @@
 {"accepted_positions": [
+  {"odds": "n", "fen": "FRC", "color": "white", "go_options": {"nodes": 10000}, "uci_options": {"SwapColors": "true", "ScLimit": 20, "DrawScore": 0.0, "WeightsFile": "lko_v3a.pb", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
+
   {"odds": "n", "fen": "r1bqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lko_v3a.pb", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
   {"odds": "n", "fen": "rnbqkb1r/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq", "color": "white", "go_options": {"nodes": 800}, "uci_options": {"SwapColors": "true", "DrawScore": 0.0, "WeightsFile": "lko_v3a.pb", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
   {"odds": "N", "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/R1BQKBNR w KQkq", "color": "black", "go_options": {"nodes": 800}, "uci_options": {"DrawScore": -0.0, "WeightsFile": "lko_v3a.pb", "Temperature": 1.0, "TempDecayMoves": 8, "TempValueCutoff": 1.0, "TempEndgame": 0.05}},
