@@ -4,7 +4,6 @@ from lib.lichess_types import OPTIONS_TYPE
 import json
 import re
 
-
 def game_specific_options(game: model.Game) -> OPTIONS_TYPE:  # noqa: ARG001
     """
     Return a dictionary of engine options based on game aspects.
@@ -37,7 +36,6 @@ def extract_fenlist(initial_fen, color):
     uci_override = {}
     go_options = {}
     missing_pieces, color_fullrank = missing_pieces_in_FEN(initial_fen)
-    print(missing_pieces)
     with open('fenlist.json') as f:
         for position in json.load(f)["accepted_positions"]:
             if initial_fen.startswith(position["fen"]) and color == position["color"]:
@@ -46,7 +44,7 @@ def extract_fenlist(initial_fen, color):
                 go_options = position["go_options"]if "go_options" in position.keys() else {}
                 break
             if position["fen"] == "FRC":
-                if (missing_pieces.sort() == position["odds"].sort()) and color == position["color"] and color == color_fullrank:
+                if sorted(missing_pieces) == sorted(position["odds"]) and color == position["color"] and color == color_fullrank:
                     found_position = True
                     uci_override = position["uci_options"] if "uci_options" in position.keys() else {}
                     go_options = position["go_options"]if "go_options" in position.keys() else {}
@@ -69,27 +67,21 @@ def missing_pieces_in_FEN(initial_fen):
     if backrank_white.count("R") == 2:
         if not re.search(r"R.*K.*R", backrank_white):
             deny = True
-            print("wrong rook order")
     if backrank_black.count("r") == 2:
         if not re.search(r"r.*k.*r", backrank_black):
             deny = True
-            print("wrong rook order")
     # check for equal number of squares between bishops
     if backrank_white.count("B") == 2:
         if not re.search(r"B(..)*B", backrank_white):
             deny = True
-            print("bishops on same color")
     if backrank_black.count("b") == 2:
         if not re.search(r"b(..)*b", backrank_black):
             deny = True
-            print("bishops on same color")
     # check for full castling rights
     if backrank_white.count("R") != len(re.sub(r"[^A-Z]*", "", castling)):
         deny = True
-        print("castling rights white")
     if backrank_black.count("r") != len(re.sub(r"[^a-z]*", "", castling)):
         deny = True
-        print("castling rights black")
 
     # compare whether black and white have the same setup
     color_fullrank = None
@@ -111,14 +103,9 @@ def missing_pieces_in_FEN(initial_fen):
                     missing_pieces += white_piece.lower()
                 elif black_piece.upper() != white_piece:
                     deny = True
-                    print(white_piece, black_piece)
             if color_fullrank == "black":
                 if white_piece == "1":
                     missing_pieces += black_piece.upper()
                 elif white_piece.lower() != black_piece:
                     deny = True
-                    print(white_piece, black_piece)
     return missing_pieces if not deny else "", color_fullrank
-
-
-print(missing_pieces_in_FEN("r2qkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq"))
