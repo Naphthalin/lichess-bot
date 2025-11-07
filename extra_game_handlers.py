@@ -48,7 +48,6 @@ def extract_fenlist(initial_fen, color):
                     found_position = True
                     uci_override = position["uci_options"] if "uci_options" in position.keys() else {}
                     go_options = position["go_options"]if "go_options" in position.keys() else {}
-                    break
 
     return found_position, uci_override, go_options
 
