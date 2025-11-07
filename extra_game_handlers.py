@@ -59,8 +59,8 @@ def missing_pieces_in_FEN(initial_fen):
         deny = True
     if any(row != "8" for row in rows[2:6]):
         deny = True
-    backrank_white = rows[7].replace("2", "11").replace("3", "111").replace("4", "1111")
-    backrank_black = rows[0].replace("2", "11").replace("3", "111").replace("4", "1111")
+    backrank_white = rows[7].replace("2", "11").replace("3", "111").replace("4", "1111").replace("5", 5*"1").replace("6", 6*"1").replace("7", 7*"1")
+    backrank_black = rows[0].replace("2", "11").replace("3", "111").replace("4", "1111").replace("5", 5*"1").replace("6", 6*"1").replace("7", 7*"1")
 
     # check for king between rooks
     if backrank_white.count("R") == 2:
