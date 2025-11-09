@@ -88,8 +88,18 @@ def missing_pieces_in_FEN(initial_fen):
 
     if sum([backrank_white.count(piece) for piece in ["K", "Q", "R", "B", "N"]]) == 8:
         color_fullrank = "white"
+        if backrank_white == "RNBQKBNR":
+            deny = True
+        for (piece, count) in zip(["K", "Q", "R", "B", "N"], [1,1,2,2,2]):
+            if backrank_white.count(piece) != count:
+                deny = True
     if sum([backrank_black.count(piece) for piece in ["k", "q", "r", "b", "n"]]) == 8:
         color_fullrank = "black"
+        if backrank_black == "rnbqkbnr":
+            deny = True
+        for (piece, count) in zip(["k", "q", "r", "b", "n"], [1,1,2,2,2]):
+            if backrank_black.count(piece) != count:
+                deny = True
 
     if color_fullrank not in ["white", "black"]:
         deny = True
