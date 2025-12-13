@@ -23,6 +23,10 @@ def is_supported_extra(challenge: model.Challenge) -> bool:  # noqa: ARG001
 
     By default, True is always returned so that there are no extra restrictions beyond those in the config file.
     """
+    if (challenge.variant != "fromPosition"):
+        # This is a workaround for fromPosition with FRC castling, since lichess-bot
+        # requires accepting chess960 challenges in the config.yml, but regular chess960 challenges don't include an initial_fen.
+        return False
     initial_fen = challenge.initial_fen if (challenge.variant == "fromPosition" or challenge.variant == "chess960") else "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
     found_position = extract_fenlist(initial_fen, challenge.color)[0]
     return found_position
