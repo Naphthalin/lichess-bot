@@ -2,9 +2,7 @@
 from lib import model
 from lib.lichess_types import OPTIONS_TYPE
 import json
-import logging
 
-logger = logging.getLogger(__name__)
 
 def game_specific_options(game: model.Game) -> OPTIONS_TYPE:  # noqa: ARG001
     """
@@ -26,7 +24,6 @@ def is_supported_extra(challenge: model.Challenge) -> bool:  # noqa: ARG001
     By default, True is always returned so that there are no extra restrictions beyond those in the config file.
     """
     initial_fen = challenge.initial_fen if challenge.variant == "fromPosition" else "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
-    logger.info(f"Received challenge {initial_fen} with color {challenge.color}")
     found_position = extract_fenlist(initial_fen, challenge.color)[0]
     return found_position
 
