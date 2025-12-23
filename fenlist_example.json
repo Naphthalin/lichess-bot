@@ -1,0 +1,4 @@
+{"accepted_positions": [
+  {"fen": "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq", "color": "white", "go_options": {"nodes": 12000}, "uci_options": {"SwapColors": "true","ScLimit": 32, "CPuct": 1.5, "FpuValue": 0.4, "DrawScore": 0.6, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 0.8, "TempDecayMoves": 12, "TempDecayDelayMoves": 6, "TempValueCutoff": 0.5, "TempEndgame": 0, "BackendOptions": "gpu=0,max_batch=84"}},
+  {"fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq", "color": "black", "go_options": {"nodes": 15000}, "uci_options": {"ScLimit": 40, "CPuct": 1.5, "FpuValue": 0.4, "DrawScore": -0.4, "WeightsFile": "lqo_v2.pb.gz", "Temperature": 0.8, "TempDecayMoves": 12, "TempDecayDelayMoves": 6, "TempValueCutoff": 0.5, "TempEndgame": 0, "BackendOptions": "gpu=0,max_batch=84"}}
+]}
