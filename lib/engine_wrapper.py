@@ -49,6 +49,8 @@ def create_engine(engine_config: Configuration, game: model.Game | None = None) 
         commands.append(cfg.interpreter)
         commands.extend(cfg.interpreter_options)
     commands.append(engine_path)
+    if cfg.positional_arguments:
+        commands.extend(cfg.positional_arguments)
     if cfg.engine_options:
         for k, v in cfg.engine_options.items():
             commands.append(f"--{k}={v}" if v is not None else f"--{k}")

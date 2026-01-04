@@ -1,0 +1,20 @@
+token: "xxxxxxxxxxxxxxxxxxxxxx"    # Unused but required by parser.
+url: "https://lichess.org/"        # Unused but required by parser.
+server_lock_file: "leela_backendserver.lock"
+
+engine:                            # Engine settings.
+  dir: "./engines/"                # Directory containing the engine. This can be an absolute path or one relative to lichess-bot/.
+  name: "lc0"              # Binary name of the engine to use.
+  positional_arguments: ["backendserver"]
+  working_dir: ""                  # Directory where the chess engine will read and write files. If blank or missing, the current directory is used.
+                                   # NOTE: If working_dir is set, the engine will look for files and directories relative to this directory, not where lichess-bot was launched. Absolute paths are unaffected.
+  protocol: "uci"                  # "uci", "xboard" or "homemade"
+
+engine_options:                  # Any custom command line params to pass to the engine.
+  network-directory: "./networks/"  # Directory containing networks for all bots.
+
+  uci_options:                     # Arbitrary UCI options passed to the engine.
+    MinibatchSize: 84
+
+  silence_stderr: false            # Some engines (yes you, Leela) are very noisy.
+
