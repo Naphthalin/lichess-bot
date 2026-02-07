@@ -52,4 +52,5 @@ Example bot configuration:
 ```yaml
   engine_options:
     backend: "client"
+    backend-options: "network: lko_v3a.pb"
 ```
