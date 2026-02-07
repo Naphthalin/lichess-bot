@@ -71,7 +71,7 @@ class VersioningType(TypedDict):
 
 logger = logging.getLogger(__name__)
 
-with open("lib/versioning.yml") as version_file:
+with open(os.path.join(os.path.dirname(__file__), "versioning.yml")) as version_file:
     versioning_info: VersioningType = yaml.safe_load(version_file)
 
 __version__ = versioning_info["lichess_bot_version"]
@@ -184,6 +184,7 @@ def logging_configurer(level: int, filename: str | None, disable_auto_logs: bool
         all_handlers.append(file_handler)
 
     if not disable_auto_logs:
+        print(auto_log_directory)
         os.makedirs(auto_log_directory, exist_ok=True)
 
         # Set up automatic logging.
@@ -398,7 +399,7 @@ def lichess_bot_main(li: lichess.Lichess,
             elif event["type"] == "challengeDeclined":
                 matchmaker.declined_challenge(event)
             elif event["type"] == "challengeCanceled":
-                active_games.discard(event["game"]["id"])
+                active_games.discard(event["challenge"]["id"])
                 log_proc_count("Freed", active_games)
             elif event["type"] == "gameStart":
                 matchmaker.accepted_challenge(event)
@@ -1167,6 +1168,11 @@ def intro() -> str:
 
 auto_log_directory = "lichess_bot_auto_logs"
 
+def set_auto_log_directory(directory: str) -> None:
+    """Set the directory where automatic logs are stored."""
+    global auto_log_directory
+    auto_log_directory = directory
+
 
 def log_python_and_libraries() -> None:
     """Log the installed libraries and the python version."""
@@ -1177,6 +1183,18 @@ def log_python_and_libraries() -> None:
         text += f"{distribution.metadata['Name']}=={distribution.version}\n"
     text += "\n"
     logger.debug(text)
+
+def lc0_start_backend_server(config) -> None:
+    """Start the LC0 backend server if needed."""
+    logger.info("Checking LC0 backend server configuration ...")
+    if config.script and os.path.isfile(config.script):
+        logger.info("Starting LC0 backend server: %s %s %s", sys.executable, config.script, " ".join(config.arguments))
+        mode = os.P_NOWAIT
+        if os.name == "nt":
+            mode |= os.DETACH
+        command = [sys.executable, sys.executable, config.script] + config.arguments
+        pid = os.spawnlp(mode, *command)
+        logger.info(f"Started LC0 backend server with pid={pid}")
 
 
 def start_lichess_bot() -> None:
@@ -1205,6 +1223,7 @@ def start_lichess_bot() -> None:
     max_retries = CONFIG.engine.online_moves.max_retries
     check_python_version()
     log_python_and_libraries()
+    lc0_start_backend_server(CONFIG.backendserver)
     li = lichess.Lichess(CONFIG.token, CONFIG.url, __version__, logging_level, max_retries)
 
     user_profile = li.get_profile()
