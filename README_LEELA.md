@@ -39,10 +39,6 @@ engine:
 engine_options:
   network-directory: "./networks/"
   backend: "onnx-trt"
-  backend-opts: "opt_batch=84,block_event_waits=true"
-
-  uci_options:
-    MinibatchSize: 84
 
   silence_stderr: false
 ```
