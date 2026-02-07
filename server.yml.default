@@ -10,8 +10,9 @@ engine:                            # Engine settings.
                                    # NOTE: If working_dir is set, the engine will look for files and directories relative to this directory, not where lichess-bot was launched. Absolute paths are unaffected.
   protocol: "uci"                  # "uci", "xboard" or "homemade"
 
-engine_options:                  # Any custom command line params to pass to the engine.
-  network-directory: "./networks/"  # Directory containing networks for all bots.
+  engine_options:                  # Any custom command line params to pass to the engine.
+    backend: onnx-trt
+    network-directory: "./networks/"  # Directory containing networks for all bots.
 
   uci_options:                     # Arbitrary UCI options passed to the engine.
     MinibatchSize: 84

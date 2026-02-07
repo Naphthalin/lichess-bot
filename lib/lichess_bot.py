@@ -1187,15 +1187,14 @@ def log_python_and_libraries() -> None:
 def lc0_start_backend_server(config) -> None:
     """Start the LC0 backend server if needed."""
     logger.info("Checking LC0 backend server configuration ...")
-    logger.info(config.script + " " + str(os.path.isfile(config.script)) + " " + " ".join(config.arguments))
-    if os.path.isfile(config.script):
-        logger.info("Starting LC0 backend server ...")
+    if config.script and os.path.isfile(config.script):
+        logger.info("Starting LC0 backend server: %s %s %s", sys.executable, config.script, " ".join(config.arguments))
         mode = os.P_NOWAIT
         if os.name == "nt":
             mode |= os.DETACH
-        pid = os.spawnl(mode, sys.executable, [config.script] + config.arguments)
+        command = [sys.executable, sys.executable, config.script] + config.arguments
+        pid = os.spawnlp(mode, *command)
         logger.info(f"Started LC0 backend server with pid={pid}")
-    raise NotImplementedError("LC0 backend server start not implemented yet.")
 
 
 def start_lichess_bot() -> None:
