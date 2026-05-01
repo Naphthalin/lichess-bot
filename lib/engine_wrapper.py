@@ -9,6 +9,7 @@ import chess
 import subprocess
 import logging
 import datetime
+import json
 import time
 import random
 import math
@@ -95,6 +96,7 @@ class EngineWrapper:
         """
         self.engine: chess.engine.SimpleEngine | FillerEngine
         self.scores: list[chess.engine.PovScore] = []
+        self.pv: list[chess.Move] = []
         self.draw_or_resign = draw_or_resign
         self.go_commands = Configuration(cast(GO_COMMANDS_TYPE, options.pop("go_commands", {})) or {})
         self.move_commentary: list[InfoStrDict] = []
@@ -208,6 +210,54 @@ class EngineWrapper:
             li.resign(game.id)
         else:
             li.make_move(game.id, best_move)
+        if self.verbose_stats is not None:
+            self.store_verbose_move_stats(engine_cfg, game, best_move, board, self.verbose_stats)
+            self.verbose_stats = None
+
+    def store_verbose_move_stats(self,
+                                 engine_cfg: Configuration,
+                                 game: model.Game,
+                                 results: chess.engine.PlayResult,
+                                 board: chess.Board,
+                                 stats: list[Dict]) -> None:
+        """Store verbose move stats to json file."""
+
+        move_cfg = engine_cfg.move_stats
+        logger.info(f"{move_cfg}, {move_cfg.verbose_path}")
+        if engine_cfg.move_stats is None or move_cfg.verbose_path is None:
+            return
+
+        game_id = game.id
+        bot_name = game.me.name
+        if bot_name is None or game_id is None:
+            logger.warning("Cannot store move stats because bot name or game id is None.")
+            return
+        stats_dir = f"{move_cfg.verbose_path}/{bot_name}"
+        os.makedirs(stats_dir, exist_ok=True)
+        filename = f"{stats_dir}/{game_id}.json"
+        all_stats = {}
+        if os.path.exists(filename):
+            with open(filename, "r") as f:
+                all_stats = json.load(f)
+        pv = results.info.get("pv", [None])
+        pv = board.variation_san(pv)
+        move_number = board.ply()
+        for s in stats[0]:
+            s["move"] = board.san(board.parse_uci(s.get("move")))
+        stats[0].reverse()
+        all_stats[move_number] = stats[0]
+        if len(stats[1]) > 0:
+            board.push(results.move)
+            for s in stats[1]:
+                s["move"] = board.san(board.parse_uci(s.get("move")))
+            stats[1].reverse()
+            all_stats[move_number + 1] = stats[1]
+            board.pop()
+        all_stats[str(move_number) + ".pv"] = pv
+        logger.info(f"{game_id}: Stats: {stats}, {all_stats}")
+
+        with open(filename, "w") as f:
+            json.dump(all_stats, f, indent=4)
 
     def add_go_commands(self, time_limit: chess.engine.Limit) -> chess.engine.Limit:
         """Add extra commands to send to the engine. For example, to search for 1000 nodes or up to depth 10."""
@@ -264,15 +314,61 @@ class EngineWrapper:
         :return: The move to play.
         """
         time_limit = self.add_go_commands(time_limit)
-        result = self.engine.play(board,
+        analyse = self.engine.analysis(board,
                                   time_limit,
                                   info=chess.engine.INFO_ALL,
-                                  ponder=ponder,
-                                  draw_offered=draw_offered,
-                                  root_moves=root_moves if isinstance(root_moves, list) else None)
+                                  root_moves=root_moves if isinstance(root_moves, list) else None,
+                                  options={"VerboseMoveStats": True} if isinstance(self, UCIEngine) else None)
+        last_info = None
+        verbose_stats = [[], []]
+        def ParseVerboseStats(move: chess.Move, line: str) -> Dict:
+            stats = {"move": move}
+            unknown = "-.-"
+            while line:
+                token, line = chess.engine._next_token(line)
+                try:
+                    if token == 'N:':
+                        visits, line = chess.engine._next_token(line)
+                        stats["visits"] = int(visits)
+                    elif token == '(WL:':
+                        wl, line = chess.engine._next_token(line)
+                        if wl.startswith(unknown):
+                            continue;
+                        stats['winlose'] = float(wl.rstrip("%)"))
+                    elif token == '(D:':
+                        draw, line = chess.engine._next_token(line)
+                        if draw.startswith(unknown):
+                            continue;
+                        stats["draw"] = float(draw.rstrip("%)"))
+                    elif token == '(P:':
+                        policy, line = chess.engine._next_token(line)
+                        stats["policy"] = float(policy.rstrip("%)"))
+                    elif token == '(O:':
+                        offset, line = chess.engine._next_token(line)
+                        if offset.startswith(unknown):
+                            continue;
+                        stats["offset"] = float(offset.rstrip("%)"))
+                except ValueError:
+                    logger.warning(f"Failed to parse verbose move stats token: {token}, line: {line}")
+            return stats
+
+        side = 0
+        for line in analyse:
+            if line.get("depth") is not None:
+                last_info = line
+            elif line.get("string") is not None:
+                verbose = line.get("string")
+                str_move, str_stats = chess.engine._next_token(verbose)
+                if str_move == "node":
+                    side = 1
+                    continue
+                verbose_stats[side].append(ParseVerboseStats(str_move, str_stats))
+        bestmove = analyse.wait()
+        result = chess.engine.PlayResult(bestmove.move, bestmove.ponder, last_info)
         # Use null_score to have no effect on draw/resign decisions
         null_score = chess.engine.PovScore(chess.engine.Mate(1), board.turn)
         self.scores.append(result.info.get("score", null_score))
+        self.verbose_stats = verbose_stats
         return self.offer_draw_or_resign(result, board)
 
     def comment_index(self, move_stack_index: int) -> int:
