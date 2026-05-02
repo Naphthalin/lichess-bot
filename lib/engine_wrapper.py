@@ -232,6 +232,9 @@ class EngineWrapper:
         if bot_name is None or game_id is None:
             logger.warning("Cannot store move stats because bot name or game id is None.")
             return
+        if len(stats[0]) == 0:
+            logger.info("No move stats to store. Is VerboseMoveStats UCI option enabled?")
+            return
         stats_dir = f"{move_cfg.verbose_path}/{bot_name}"
         os.makedirs(stats_dir, exist_ok=True)
         filename = f"{stats_dir}/{game_id}.json"
