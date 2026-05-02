@@ -4,6 +4,7 @@ access to bot generated json files.
 To run it use `python3 -m flask run`
 """
 import flask
+from flask_cors import CORS
 from lib.config import load_config, Configuration
 
 CONFIG = load_config("./config.yml")
@@ -24,3 +25,4 @@ if verbose_path is None:
     raise Exception("No verbose_path specified in config.yml")
 
 app = flask.Flask(__name__, static_folder=verbose_path, static_url_path='/')
+cors = CORS(app, resources={r"/*": {"origins": "*"}})
