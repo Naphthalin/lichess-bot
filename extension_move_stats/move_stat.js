@@ -2,9 +2,10 @@ const ext = function () {
     var BotNames = [
 	    "LeelaKnightOdds",
 	    "LeelaRookOdds",
-	    "LeelaQueenForKnightodds",
+	    "LeelaQueenOdds",
+	    "LeelaQueenForKnight",
 	    "LeelaPieceOdds",
-	    "LeelaOddsTestingBot",
+	    "LeelaPieceOddsFRC",
     ];
 
     var MoveStatURL = "http://localhost:5000/";
