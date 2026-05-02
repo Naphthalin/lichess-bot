@@ -5,7 +5,7 @@ To run it use `python3 -m flask run`
 """
 import flask
 from flask_cors import CORS
-from lib.config import load_config, Configuration
+from lib.config import load_config
 
 CONFIG = load_config("./config.yml")
 

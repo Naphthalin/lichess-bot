@@ -246,7 +246,11 @@ class EngineWrapper:
         all_stats = {}
         if os.path.exists(filename):
             with open(filename, "r") as f:
-                all_stats = json.load(f)
+                try:
+                    all_stats = json.load(f)
+                except json.JSONDecodeError:
+                    logger.warning(f"Failed to decode existing move stats json file: {filename}. Overwriting with new stats.")
+                    all_stats = {}
         move_number = board.ply()
         for s in stats[0]:
             s["move"] = board.san(s.get("move"))
@@ -321,7 +325,7 @@ class EngineWrapper:
             r = line.split(maxsplit=1)
             return r[0] if r else "", r[1] if len(r) == 2 else ""
 
-        def ParseVerboseStats(side: int, move: chess.Move, line: str) -> Dict:
+        def parse_verbose_move_stats(side: int, move: chess.Move, line: str) -> dict[str, Any]:
             stats = {"move": move}
             unknown = "-.-"
             while line:
@@ -333,12 +337,12 @@ class EngineWrapper:
                     elif token == '(WL:':
                         wl, line = next_token(line)
                         if wl.startswith(unknown):
-                            continue;
+                            continue
                         stats['winlose'] = float(wl.rstrip("%)"))
                     elif token == '(D:':
                         draw, line = next_token(line)
                         if draw.startswith(unknown):
-                            continue;
+                            continue
                         stats["draw"] = float(draw.rstrip("%)"))
                     elif token == '(P:':
                         policy, line = next_token(line)
@@ -346,7 +350,7 @@ class EngineWrapper:
                     elif token == '(O:':
                         offset, line = next_token(line)
                         if offset.startswith(unknown):
-                            continue;
+                            continue
                         stats["offset"] = float(offset.rstrip("%)"))
                 except ValueError:
                     logger.warning(f"Failed to parse verbose move stats token: {token}, line: {line}")
@@ -387,7 +391,7 @@ class EngineWrapper:
                         side = 1
                         continue
                     move = board.parse_uci(str_move)
-                    verbose_stats[side].append(ParseVerboseStats(side, move, str_stats))
+                    verbose_stats[side].append(parse_verbose_move_stats(side, move, str_stats))
             board.pop()
             bestmove = analyse.wait()
         result = chess.engine.PlayResult(bestmove.move, bestmove.ponder, last_info[0])

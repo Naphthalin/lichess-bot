@@ -6,6 +6,7 @@ const ext = function () {
 	    "LeelaQueenForKnight",
 	    "LeelaPieceOdds",
 	    "LeelaPieceOddsFRC",
+	    "LeelaOddsTestingBot",
     ];
 
     var MoveStatURL = "http://localhost:5000/";
