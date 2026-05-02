@@ -80,7 +80,7 @@ const ext = function () {
 				<th>Visits</th>
 				<th>Policy</th>
 				<th>Score (W/D/L)</th>
-				<th>Offset (W/D/L)</th>
+				<th>Offset</th>
 				<th>PV</th>
 			</tr>
 		</thead>
@@ -136,7 +136,6 @@ const ext = function () {
 			    panel.innerText = "No move data found for move number: " + moveNumber;
 			    return;
 		    }
-		    const pvData = gameData[moveNumber.toString() + ".pv"];
 
 		    var tableHTML = tableHeader;
 		    for (const moveCandidate of moveData) {
@@ -146,6 +145,7 @@ const ext = function () {
 			    const wl = moveCandidate.winlose;
 			    const draw = moveCandidate.draw;
 			    const offsetData = moveCandidate.offset;
+			    const pvData = moveCandidate.pv;
 
 			    var score = "";
 			    var offset = "";
@@ -159,19 +159,11 @@ const ext = function () {
 
 			    if (moveCandidate.hasOwnProperty("offset")) {
 				    offset = (offsetData * 50.0).toFixed(2) + "%";
-				    if (moveCandidate.hasOwnProperty("winlose")) {
-					    const wlo = wl + offsetData / 2.0;
-					    const w = (1.0 + wlo - draw) / 2.0
-					    const l = (1.0 - wlo - draw) / 2.0
-					    offset += " (" + (w * 100.0).toFixed(0) + "/" + (draw * 100.0).toFixed(0) + "/" + (l * 100.0).toFixed(0) + ")";
-				    }
 			    }
 
 			    var pv = "";
-			    if (pvData) {
-				    if (pvData.match("[0-9]+[.]+" + san)) {
-					    pv = pvTemplate(pvData);
-				    }
+			    if (moveCandidate.hasOwnProperty("pv")) {
+				    pv = pvTemplate(pvData);
 			    }
 
 			    tableHTML += tableRowTemplate(san, visits, policy, score, offset, pv);

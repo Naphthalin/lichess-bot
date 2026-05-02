@@ -96,7 +96,7 @@ class EngineWrapper:
         """
         self.engine: chess.engine.SimpleEngine | FillerEngine
         self.scores: list[chess.engine.PovScore] = []
-        self.pv: list[chess.Move] = []
+        self.verbose_stats = None
         self.draw_or_resign = draw_or_resign
         self.go_commands = Configuration(cast(GO_COMMANDS_TYPE, options.pop("go_commands", {})) or {})
         self.move_commentary: list[InfoStrDict] = []
@@ -163,6 +163,7 @@ class EngineWrapper:
         online_moves_cfg = engine_cfg.online_moves
         draw_or_resign_cfg = engine_cfg.draw_or_resign
         lichess_bot_tbs = engine_cfg.lichess_bot_tbs
+        multi_pv = engine_cfg.multi_pv if engine_cfg.multi_pv else 1
 
         best_move: MOVE
         best_move = get_book_move(board, game, polyglot_cfg)
@@ -188,7 +189,7 @@ class EngineWrapper:
                                                is_correspondence, correspondence_move_time)
 
             try:
-                best_move = self.search(board, time_limit, can_ponder, draw_offered, best_move)
+                best_move = self.search(board, time_limit, multi_pv, can_ponder, draw_offered, best_move)
             except chess.engine.EngineError as error:
                 BadMove = (chess.IllegalMoveError, chess.InvalidMoveError)
                 if not any(isinstance(e, BadMove) for e in error.args):
@@ -210,17 +211,21 @@ class EngineWrapper:
             li.resign(game.id)
         else:
             li.make_move(game.id, best_move)
-        if self.verbose_stats is not None:
-            self.store_verbose_move_stats(engine_cfg, game, best_move, board, self.verbose_stats)
-            self.verbose_stats = None
+
+        self.store_verbose_move_stats(engine_cfg, game, best_move, board)
 
     def store_verbose_move_stats(self,
                                  engine_cfg: Configuration,
                                  game: model.Game,
                                  results: chess.engine.PlayResult,
-                                 board: chess.Board,
-                                 stats: list[Dict]) -> None:
+                                 board: chess.Board) -> None:
         """Store verbose move stats to json file."""
+
+        if self.verbose_stats is None:
+            return
+
+        stats = self.verbose_stats
+        self.verbose_stats = None
 
         move_cfg = engine_cfg.move_stats
         logger.debug(f"{move_cfg}, {move_cfg.verbose_path if move_cfg else None}")
@@ -235,28 +240,25 @@ class EngineWrapper:
         if len(stats[0]) == 0:
             logger.info("No move stats to store. Is VerboseMoveStats UCI option enabled?")
             return
-        stats_dir = f"{move_cfg.verbose_path}/{bot_name}"
+        stats_dir = os.path.join(move_cfg.verbose_path, bot_name)
         os.makedirs(stats_dir, exist_ok=True)
-        filename = f"{stats_dir}/{game_id}.json"
+        filename = os.path.join(stats_dir, f"{game_id}.json")
         all_stats = {}
         if os.path.exists(filename):
             with open(filename, "r") as f:
                 all_stats = json.load(f)
-        pv = results.info.get("pv", [None])
-        pv = board.variation_san(pv)
         move_number = board.ply()
         for s in stats[0]:
-            s["move"] = board.san(board.parse_uci(s.get("move")))
+            s["move"] = board.san(s.get("move"))
         stats[0].reverse()
-        all_stats[move_number] = stats[0]
+        all_stats[str(move_number)] = stats[0]
         if len(stats[1]) > 0:
             board.push(results.move)
             for s in stats[1]:
-                s["move"] = board.san(board.parse_uci(s.get("move")))
+                s["move"] = board.san(s.get("move"))
             stats[1].reverse()
-            all_stats[move_number + 1] = stats[1]
+            all_stats[str(move_number + 1)] = stats[1]
             board.pop()
-        all_stats[str(move_number) + ".pv"] = pv
 
         with open(filename, "w") as f:
             json.dump(all_stats, f, indent=4)
@@ -303,7 +305,7 @@ class EngineWrapper:
                 result.resigned = True
         return result
 
-    def search(self, board: chess.Board, time_limit: chess.engine.Limit, ponder: bool, draw_offered: bool,
+    def search(self, board: chess.Board, time_limit: chess.engine.Limit, multi_pv: int, ponder: bool, draw_offered: bool,
                root_moves: MOVE) -> chess.engine.PlayResult:
         """
         Tell the engine to search.
@@ -315,57 +317,80 @@ class EngineWrapper:
         :param root_moves: If it is a list, the engine will only play a move that is in `root_moves`.
         :return: The move to play.
         """
-        time_limit = self.add_go_commands(time_limit)
-        analyse = self.engine.analysis(board,
-                                  time_limit,
-                                  info=chess.engine.INFO_ALL,
-                                  root_moves=root_moves if isinstance(root_moves, list) else None)
-        last_info = None
-        verbose_stats = [[], []]
-        def ParseVerboseStats(move: chess.Move, line: str) -> Dict:
+        def next_token(line: str) -> tuple[str, str]:
+            r = line.split(maxsplit=1)
+            return r[0] if r else "", r[1] if len(r) == 2 else ""
+
+        def ParseVerboseStats(side: int, move: chess.Move, line: str) -> Dict:
             stats = {"move": move}
             unknown = "-.-"
             while line:
-                token, line = chess.engine._next_token(line)
+                token, line = next_token(line)
                 try:
                     if token == 'N:':
-                        visits, line = chess.engine._next_token(line)
+                        visits, line = next_token(line)
                         stats["visits"] = int(visits)
                     elif token == '(WL:':
-                        wl, line = chess.engine._next_token(line)
+                        wl, line = next_token(line)
                         if wl.startswith(unknown):
                             continue;
                         stats['winlose'] = float(wl.rstrip("%)"))
                     elif token == '(D:':
-                        draw, line = chess.engine._next_token(line)
+                        draw, line = next_token(line)
                         if draw.startswith(unknown):
                             continue;
                         stats["draw"] = float(draw.rstrip("%)"))
                     elif token == '(P:':
-                        policy, line = chess.engine._next_token(line)
+                        policy, line = next_token(line)
                         stats["policy"] = float(policy.rstrip("%)"))
                     elif token == '(O:':
-                        offset, line = chess.engine._next_token(line)
+                        offset, line = next_token(line)
                         if offset.startswith(unknown):
                             continue;
                         stats["offset"] = float(offset.rstrip("%)"))
                 except ValueError:
                     logger.warning(f"Failed to parse verbose move stats token: {token}, line: {line}")
+            if side > 0:
+                return stats
+
+            for index in last_info:
+                info = last_info[index]
+                pv = info.get('pv', [])
+                if pv[0] == move:
+                    stats["pv"] = board.variation_san(pv)
+                    break
+
             return stats
 
-        side = 0
-        for line in analyse:
-            if line.get("depth") is not None:
-                last_info = line
-            elif line.get("string") is not None:
-                verbose = line.get("string")
-                str_move, str_stats = chess.engine._next_token(verbose)
-                if str_move == "node":
-                    side = 1
-                    continue
-                verbose_stats[side].append(ParseVerboseStats(str_move, str_stats))
-        bestmove = analyse.wait()
-        result = chess.engine.PlayResult(bestmove.move, bestmove.ponder, last_info)
+        time_limit = self.add_go_commands(time_limit)
+        bestmove = None
+        with self.engine.analysis(board,
+                                  time_limit,
+                                  multipv=multi_pv,
+                                  info=chess.engine.INFO_ALL,
+                                  root_moves=root_moves if isinstance(root_moves, list) else None) as analyse:
+            last_info = {}
+            verbose_stats = [[], []]
+
+            side = 0
+            for line in analyse:
+                if line.get("depth") is not None:
+                    multipv = line.get("multipv", 1)
+                    last_info[multipv - 1] = line
+                elif line.get("string") is not None:
+                    verbose = line.get("string")
+                    str_move, str_stats = next_token(verbose)
+                    if str_move == "node":
+                        continue
+                    if str_move == "Best:":
+                        board.push(board.parse_uci(str_stats))
+                        side = 1
+                        continue
+                    move = board.parse_uci(str_move)
+                    verbose_stats[side].append(ParseVerboseStats(side, move, str_stats))
+            board.pop()
+            bestmove = analyse.wait()
+        result = chess.engine.PlayResult(bestmove.move, bestmove.ponder, last_info[0])
         # Use null_score to have no effect on draw/resign decisions
         null_score = chess.engine.PovScore(chess.engine.Mate(1), board.turn)
         self.scores.append(result.info.get("score", null_score))
