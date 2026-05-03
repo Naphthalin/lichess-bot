@@ -189,7 +189,7 @@ class EngineWrapper:
                                                is_correspondence, correspondence_move_time)
 
             try:
-                best_move = self.search(board, time_limit, multi_pv, can_ponder, draw_offered, best_move)
+                best_move = self.search(board, time_limit, multi_pv, best_move)
             except chess.engine.EngineError as error:
                 BadMove = (chess.IllegalMoveError, chess.InvalidMoveError)
                 if not any(isinstance(e, BadMove) for e in error.args):
@@ -309,7 +309,7 @@ class EngineWrapper:
                 result.resigned = True
         return result
 
-    def search(self, board: chess.Board, time_limit: chess.engine.Limit, multi_pv: int, ponder: bool, draw_offered: bool,
+    def search(self, board: chess.Board, time_limit: chess.engine.Limit, multi_pv: int,
                root_moves: MOVE) -> chess.engine.PlayResult:
         """
         Tell the engine to search.
@@ -689,7 +689,7 @@ class MinimalEngine(EngineWrapper):
         """Homemade engines don't have a pid, so we return a question mark."""
         return "?"
 
-    def search(self, board: chess.Board, time_limit: chess.engine.Limit, ponder: bool, draw_offered: bool,
+    def search(self, board: chess.Board, time_limit: chess.engine.Limit, multipv: int,
                root_moves: MOVE) -> chess.engine.PlayResult:
         """
         Choose a move.
