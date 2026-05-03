@@ -632,7 +632,8 @@ class UCIEngine(EngineWrapper):
                         continue
                     move = board.parse_uci(str_move)
                     verbose_stats[side].append(parse_verbose_move_stats(side, move, str_stats))
-            board.pop()
+            if side == 1:
+                board.pop()
             bestmove = analyse.wait()
         result = chess.engine.PlayResult(bestmove.move, bestmove.ponder, last_info.get(0, {}))
         # Use null_score to have no effect on draw/resign decisions
