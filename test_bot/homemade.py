@@ -17,7 +17,7 @@ class ScholarsMate(ExampleEngine):
         """Set up engine."""
         super().__init__(commands, options, stderr, draw_or_resign, game, debug, **popen_args)
 
-    def search(self, board: chess.Board, time_limit: chess.engine.Limit, multipv: int,
+    def search(self, board: chess.Board, time_limit: chess.engine.Limit, ponder: bool, draw_offered: bool,
                root_moves: MOVE) -> chess.engine.PlayResult:
         """Get the next scholar's mate move."""
         move_number = len(board.move_stack)

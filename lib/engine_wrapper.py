@@ -98,6 +98,7 @@ class EngineWrapper:
         self.scores: list[chess.engine.PovScore] = []
         self.verbose_stats = None
         self.draw_or_resign = draw_or_resign
+        self.multipv = None
         self.go_commands = Configuration(cast(GO_COMMANDS_TYPE, options.pop("go_commands", {})) or {})
         self.move_commentary: list[InfoStrDict] = []
         self.comment_start_index = -1
@@ -112,7 +113,10 @@ class EngineWrapper:
         """
         try:
             extra_options = {"uci": {}, "go": {}} if game is None else game_specific_options(game)
-            self.engine.configure(cast(OPTIONS_TYPE, options | extra_options.get("uci", {})))
+            all_options = options | extra_options.get("uci", {})
+            self.multipv = all_options.get('PVMulti', None)
+            all_options.pop('PVMulti', None)
+            self.engine.configure(cast(OPTIONS_TYPE, all_options))
             if "nodes" in extra_options.get("go", {}).keys():
                 self.go_commands = Configuration(cast(GO_COMMANDS_TYPE, extra_options["go"]) or {})
         except Exception:
@@ -163,7 +167,6 @@ class EngineWrapper:
         online_moves_cfg = engine_cfg.online_moves
         draw_or_resign_cfg = engine_cfg.draw_or_resign
         lichess_bot_tbs = engine_cfg.lichess_bot_tbs
-        multi_pv = engine_cfg.multi_pv if engine_cfg.multi_pv else 1
 
         best_move: MOVE
         best_move = get_book_move(board, game, polyglot_cfg)
@@ -189,7 +192,7 @@ class EngineWrapper:
                                                is_correspondence, correspondence_move_time)
 
             try:
-                best_move = self.search(board, time_limit, multi_pv, best_move)
+                best_move = self.search(board, time_limit, can_ponder, draw_offered, best_move)
             except chess.engine.EngineError as error:
                 BadMove = (chess.IllegalMoveError, chess.InvalidMoveError)
                 if not any(isinstance(e, BadMove) for e in error.args):
@@ -309,7 +312,7 @@ class EngineWrapper:
                 result.resigned = True
         return result
 
-    def search(self, board: chess.Board, time_limit: chess.engine.Limit, multi_pv: int,
+    def search(self, board: chess.Board, time_limit: chess.engine.Limit, ponder: bool, draw_offered: bool,
                root_moves: MOVE) -> chess.engine.PlayResult:
         """
         Tell the engine to search.
@@ -325,8 +328,8 @@ class EngineWrapper:
         result = self.engine.play(board,
                                   time_limit,
                                   info=chess.engine.INFO_ALL,
-                                  ponder=None,
-                                  draw_offered=None,
+                                  ponder=ponder,
+                                  draw_offered=draw_offered,
                                   root_moves=root_moves if isinstance(root_moves, list) else None)
         # Use null_score to have no effect on draw/resign decisions
         null_score = chess.engine.PovScore(chess.engine.Mate(1), board.turn)
@@ -558,9 +561,9 @@ class UCIEngine(EngineWrapper):
                                                           **popen_args)
         self.configure(options, game)
 
-    def search(self, board: chess.Board, time_limit: chess.engine.Limit, multi_pv: int,
+    def search(self, board: chess.Board, time_limit: chess.engine.Limit, ponder: bool, draw_offered: bool,
                root_moves: MOVE) -> chess.engine.PlayResult:
-        """Override search to add multi_pv for UCI engines."""
+        """Override search to add multi_pv and verbose stats parsing for UCI engines."""
         def next_token(line: str) -> tuple[str, str]:
             r = line.split(maxsplit=1)
             return r[0] if r else "", r[1] if len(r) == 2 else ""
@@ -610,7 +613,7 @@ class UCIEngine(EngineWrapper):
         bestmove = None
         with self.engine.analysis(board,
                                   time_limit,
-                                  multipv=multi_pv,
+                                  multipv=self.multipv,
                                   info=chess.engine.INFO_ALL,
                                   root_moves=root_moves if isinstance(root_moves, list) else None) as analyse:
             last_info = {}
@@ -705,7 +708,7 @@ class MinimalEngine(EngineWrapper):
         """Homemade engines don't have a pid, so we return a question mark."""
         return "?"
 
-    def search(self, board: chess.Board, time_limit: chess.engine.Limit, multipv: int,
+    def search(self, board: chess.Board, time_limit: chess.engine.Limit, ponder: bool, draw_offered: bool,
                root_moves: MOVE) -> chess.engine.PlayResult:
         """
         Choose a move.
