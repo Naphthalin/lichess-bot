@@ -574,40 +574,25 @@ class UCIEngine(EngineWrapper):
         def parse_verbose_move_stats(side: int, move: chess.Move, line: str) -> dict[str, Any]:
             stats = {"move": move}
             unknown = "-.-"
+            keys = {
+                    'N:': "visits",
+                    '(WL:': "winlose",
+                    '(D:': "draw",
+                    '(P:': "policy",
+                    '(O:': "offset",
+                    '(UM:': "moves_utility",
+                    '(M:': "moves_left",
+                    }
             while line:
                 token, line = next_token(line)
                 try:
-                    if token == 'N:':
-                        visits, line = next_token(line)
-                        stats["visits"] = int(visits)
-                    elif token == '(WL:':
-                        wl, line = next_token(line)
-                        if wl.startswith(unknown):
-                            continue
-                        stats['winlose'] = float(wl.rstrip("%)"))
-                    elif token == '(D:':
-                        draw, line = next_token(line)
-                        if draw.startswith(unknown):
-                            continue
-                        stats["draw"] = float(draw.rstrip("%)"))
-                    elif token == '(P:':
-                        policy, line = next_token(line)
-                        stats["policy"] = float(policy.rstrip("%)"))
-                    elif token == '(O:':
-                        offset, line = next_token(line)
-                        if offset.startswith(unknown):
-                            continue
-                        stats["offset"] = float(offset.rstrip("%)"))
-                    elif token == '(UM:':
-                        moves_utility, line = next_token(line)
-                        if moves_utility.startswith(unknown):
-                            continue
-                        stats["moves_utility"] = float(moves_utility.rstrip(")"))
-                    elif token == '(M:':
-                        moves_left, line = next_token(line)
-                        if moves_left.startswith(unknown):
-                            continue
-                        stats['moves_left'] = float(moves_left.rstrip(")"))
+                    key = keys.get(token, None)
+                    if key is None:
+                        continue
+                    value, line = next_token(line)
+                    if value.startswith(unknown):
+                        continue
+                    stats[key] = float(value.rstrip("%)"))
                 except ValueError:
                     logger.warning(f"Failed to parse verbose move stats token: {token}, line: {line}")
             if side > 0:
