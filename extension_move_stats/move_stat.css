@@ -1,0 +1,11 @@
+section.allow-overflow {
+	overflow: visible;
+}
+.explorer-box tr td.pv-relative {
+	position: relative;
+}
+.explorer-box tr div.pv_box {
+	position: absolute;
+	top: 1px;
+	bottom: 1px;
+}

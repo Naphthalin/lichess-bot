@@ -95,27 +95,10 @@ const ext = function () {
 				<td>${offset}</td>
 				<td class="pv-relative">${pv}</td>
 			</tr>`;
-	    const pvStyle = `
-	    section.allow-overflow {
-		    overflow: visible;
-	    }
-	    .explorer-box tr td.pv-relative {
-		    position: relative;
-	    }
-	    .explorer-box tr div.pv_box {
-		    position: absolute;
-		    top: 1px;
-		    bottom: 1px;
-	    }`;
 	    const pvTemplate = (pv) => `<div class="pv_box"><div class="pv pv--nowrap"><span class="pv-san">${pv}</span></div></div>`;
 	    const tableFooter = "</tbody></table></section>";
 
 	    var currentMove = -1;
-
-	    var styleElem = document.createElement("style");
-	    styleElem.innerHTML = pvStyle;
-
-	    document.querySelector("head").appendChild(styleElem);
 
 	    const HashChangeHandler = (e) => {
 		    const moves = document.querySelector("div.analyse__moves move.active");
