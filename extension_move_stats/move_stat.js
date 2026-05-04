@@ -81,17 +81,19 @@ const ext = function () {
 				<th>Visits</th>
 				<th>Policy</th>
 				<th>Score (W/D/L)</th>
+				<th>Moves left</th>
 				<th>Offset</th>
 				<th>PV</th>
 			</tr>
 		</thead>
 		<tbody>`;
-	    const tableRowTemplate = (move, visits, policy, score, offset, pv) => `
+	    const tableRowTemplate = (move, visits, policy, score, moves, offset, pv) => `
 	    		<tr>
 				<td>${move}</td>
 				<td>${visits}</td>
 				<td>${policy}</td>
 				<td>${score}</td>
+				<td>${moves}</td>
 				<td>${offset}</td>
 				<td class="pv-relative">${pv}</td>
 			</tr>`;
@@ -128,11 +130,13 @@ const ext = function () {
 			    const policy = moveCandidate.policy.toFixed(2) + "%";
 			    const wl = moveCandidate.winlose;
 			    const draw = moveCandidate.draw;
+			    const moves_utility = moveCandidate.moves_utility;
 			    const offsetData = moveCandidate.offset;
 			    const pvData = moveCandidate.pv;
 
 			    var score = "";
 			    var offset = "";
+			    var moves_left = "";
 
 			    if (moveCandidate.hasOwnProperty("winlose")) {
 				    const w = (1.0 + wl - draw) / 2.0
@@ -145,12 +149,19 @@ const ext = function () {
 				    offset = (offsetData * 50.0).toFixed(2) + "%";
 			    }
 
+			    if (moveCandidate.hasOwnProperty("moves_utility")) {
+				    moves_left = (moves_utility * 50.0).toFixed(2) + "%";
+				    if (moveCandidate.hasOwnProperty("moves_left")) {
+					    moves_left = moves_left + " (" + moveCandidate.moves_left.toFixed(1) + ")";
+				    }
+			    }
+
 			    var pv = "";
 			    if (moveCandidate.hasOwnProperty("pv")) {
 				    pv = pvTemplate(pvData);
 			    }
 
-			    tableHTML += tableRowTemplate(san, visits, policy, score, offset, pv);
+			    tableHTML += tableRowTemplate(san, visits, policy, score, moves_left, offset, pv);
 		    }
 		    tableHTML += tableFooter;
 		    panel.innerHTML = tableHTML;
