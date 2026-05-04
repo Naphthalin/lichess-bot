@@ -171,17 +171,14 @@ const ext = function () {
 		    }
 		    tableHTML += tableFooter;
 		    panel.innerHTML = tableHTML;
-		    var pvs = document.querySelectorAll(".pv-relative div.pv_box");
+		    var table = document.querySelector("div.move-stat table");
 
-		    for (const pv of pvs) {
-			    var p = pv.parentElement;
-			    p.addEventListener("mouseover", (e) => {
-				    document.getElementById("move-stat-panel").classList.add("allow-overflow");
-			    });
-			    p.addEventListener("mouseout", (e) => {
-				    document.getElementById("move-stat-panel").classList.remove("allow-overflow");
-			    });
-		    }
+		    table.addEventListener("mouseover", (e) => {
+			    document.getElementById("move-stat-panel").classList.add("allow-overflow");
+		    });
+		    table.addEventListener("mouseout", (e) => {
+			    document.getElementById("move-stat-panel").classList.remove("allow-overflow");
+		    });
 	    }
 
 	    const ActivateMoveStatTab = () => {
