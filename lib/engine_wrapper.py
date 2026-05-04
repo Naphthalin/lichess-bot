@@ -99,6 +99,7 @@ class EngineWrapper:
         self.verbose_stats = None
         self.draw_or_resign = draw_or_resign
         self.multipv = None
+        self.drawscore = None
         self.go_commands = Configuration(cast(GO_COMMANDS_TYPE, options.pop("go_commands", {})) or {})
         self.move_commentary: list[InfoStrDict] = []
         self.comment_start_index = -1
@@ -114,6 +115,7 @@ class EngineWrapper:
         try:
             extra_options = {"uci": {}, "go": {}} if game is None else game_specific_options(game)
             all_options = options | extra_options.get("uci", {})
+            self.drawscore = all_options.get('DrawScore', None)
             self.multipv = all_options.get('PVMulti', None)
             all_options.pop('PVMulti', None)
             self.engine.configure(cast(OPTIONS_TYPE, all_options))
@@ -247,13 +249,14 @@ class EngineWrapper:
         os.makedirs(stats_dir, exist_ok=True)
         filename = os.path.join(stats_dir, f"{game_id}.json")
         all_stats = {}
+        if self.drawscore:
+            all_stats["drawscore"] = self.drawscore
         if os.path.exists(filename):
             with open(filename, "r") as f:
                 try:
                     all_stats = json.load(f)
                 except json.JSONDecodeError:
                     logger.warning(f"Failed to decode existing move stats json file: {filename}. Overwriting with new stats.")
-                    all_stats = {}
         move_number = board.ply()
         for s in stats[0]:
             s["move"] = board.san(s.get("move"))
