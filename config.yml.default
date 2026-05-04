@@ -13,6 +13,9 @@ engine:                            # Engine settings.
   protocol: "uci"                  # "uci", "xboard" or "homemade"
   ponder: true                     # Think on opponent's time.
 
+  move_stats:
+    verbose_path: "move_stats"   # Directory where verbose move stats will be stored in json format. Filenames are {game.id}.json
+
   polyglot:
     enabled: false                 # Activate polyglot book.
     book:

@@ -138,6 +138,24 @@ def test_uci() -> None:
         assert os.path.isfile(os.path.join(CONFIG["pgn_directory"],
                                            "bo vs b - zzzzzzzz.pgn"))
 
+def test_uci_verbose_stats() -> None:
+    """Test lichess-bot with Stockfish (UCI)."""
+    with open("./config.yml.default") as file:
+        CONFIG = yaml.safe_load(file)
+
+    with tempfile.TemporaryDirectory() as temp:
+        CONFIG["token"] = ""
+        CONFIG["engine"]["dir"] = "test_bot"
+        CONFIG["engine"]["name"] = "uci_verbose_stats.py"
+        CONFIG["engine"]["interpreter"] = sys.executable
+        CONFIG["pgn_directory"] = os.path.join(temp, "uci_game_record")
+        CONFIG["engine"]["uci_options"] = {}
+        win = run_bot(CONFIG, logging_level)
+        logger.info("Finished Testing UCI")
+        assert win
+        time.sleep(0.1)  # Wait for file to be written.
+        assert os.path.isfile(os.path.join(CONFIG["pgn_directory"],
+                                           "bo vs b - zzzzzzzz.pgn"))
 
 def test_xboard() -> None:
     """Test lichess-bot with an XBoard engine."""
