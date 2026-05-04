@@ -595,6 +595,16 @@ class UCIEngine(EngineWrapper):
                         if offset.startswith(unknown):
                             continue
                         stats["offset"] = float(offset.rstrip("%)"))
+                    elif token == '(UM:':
+                        moves_utility, line = next_token(line)
+                        if moves_utility.startswith(unknown):
+                            continue
+                        stats["moves_utility"] = float(moves_utility.rstrip(")"))
+                    elif token == '(M:':
+                        moves_left, line = next_token(line)
+                        if moves_left.startswith(unknown):
+                            continue
+                        stats['moves_left'] = float(moves_left.rstrip(")"))
                 except ValueError:
                     logger.warning(f"Failed to parse verbose move stats token: {token}, line: {line}")
             if side > 0:
