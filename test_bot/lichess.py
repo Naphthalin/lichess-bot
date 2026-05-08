@@ -1,4 +1,5 @@
 """Imitate `lichess.py`. Used in tests."""
+from __future__ import annotations
 import time
 import chess.engine
 import json
@@ -7,7 +8,7 @@ import traceback
 import datetime
 from queue import Queue
 from requests.models import Response
-from typing import Union, Optional, Generator
+from collections.abc import Generator
 from lib.lichess import Lichess as OriginalLichess
 from lib.timer import to_msec
 from lib.lichess_types import (UserProfileType, ChallengeType, REQUESTS_PAYLOAD_TYPE, GameType, OnlineType, PublicDataType,
@@ -47,8 +48,8 @@ class GameStream(Response):
         self.board_queue = board_queue
         self.clock_queue = clock_queue
 
-    def iter_lines(self, chunk_size: Optional[int] = 512, decode_unicode: bool = False,
-                   delimiter: Union[str, bytes, None] = None) -> Generator[bytes, None, None]:
+    def iter_lines(self, chunk_size: int | None = 512, decode_unicode: bool = False,
+                   delimiter: str | bytes | None = None) -> Generator[bytes, None, None]:
         """Send the game events to lichess-bot."""
         yield json.dumps(
             {"id": "zzzzzzzz",
@@ -103,6 +104,13 @@ class GameStream(Response):
                 new_game_state["status"] = "started"
                 yield json.dumps(new_game_state).encode("utf-8")
 
+    def __enter__(self) -> GameStream:  # noqa: PYI034
+        """Enter game stream context."""
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        """Exit game stream context."""
+
 
 class EventStream(Response):
     """Imitate lichess.org's EventStream. Used in tests."""
@@ -115,8 +123,8 @@ class EventStream(Response):
         """
         self.sent_game = sent_game
 
-    def iter_lines(self, chunk_size: Optional[int] = 512, decode_unicode: bool = False,
-                   delimiter: Union[str, bytes, None] = None) -> Generator[bytes, None, None]:
+    def iter_lines(self, chunk_size: int | None = 512, decode_unicode: bool = False,
+                   delimiter: str | bytes | None = None) -> Generator[bytes, None, None]:
         """Send the events to lichess-bot."""
         if self.sent_game:
             yield b""
@@ -129,13 +137,20 @@ class EventStream(Response):
                           "compat": {"bot": True,
                                      "board": True}}}).encode("utf-8")
 
+    def __enter__(self) -> EventStream:  # noqa: PYI034
+        """Enter context block."""
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        """Exit context block."""
+
 
 # Docs: https://lichess.org/api.
 class Lichess(OriginalLichess):
     """Imitate communication with lichess.org."""
 
     def __init__(self,
-                 move_queue: Queue[Optional[chess.Move]],
+                 move_queue: Queue[chess.Move | None],
                  board_queue: Queue[chess.Board],
                  clock_queue: Queue[tuple[datetime.timedelta, datetime.timedelta, datetime.timedelta]]) -> None:
         """
@@ -233,7 +248,7 @@ class Lichess(OriginalLichess):
     def cancel(self, challenge_id: str) -> None:
         """Isn't used in tests."""
 
-    def online_book_get(self, path: str, params: Optional[dict[str, Union[str, int]]] = None,
+    def online_book_get(self, path: str, params: dict[str, str | int] | None = None,
                         stream: bool = False) -> OnlineType:
         """Isn't used in tests."""
         return {}

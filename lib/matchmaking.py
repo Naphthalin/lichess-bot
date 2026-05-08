@@ -9,9 +9,10 @@ from collections import defaultdict
 from collections.abc import Sequence
 from lib.lichess import Lichess, RateLimitedError
 from lib.config import Configuration
-from typing import Optional, Union, cast
+from typing import cast, TypeAlias
+from lib.blocklist import OnlineBlocklist
 from lib.lichess_types import UserProfileType, PerfType, EventType, FilterType, ChallengeType
-MULTIPROCESSING_LIST_TYPE = Sequence[model.Challenge]
+MULTIPROCESSING_LIST_TYPE: TypeAlias = Sequence[model.Challenge]
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,8 @@ class Matchmaking:
         for name in self.matchmaking_cfg.block_list:
             self.add_to_block_list(name)
 
+        self.online_block_list = OnlineBlocklist(self.matchmaking_cfg.online_block_list)
+
     def should_create_challenge(self) -> bool:
         """Whether we should create a challenge."""
         matchmaking_enabled = self.matchmaking_cfg.allow_matchmaking
@@ -63,7 +66,7 @@ class Matchmaking:
     def create_challenge(self, username: str, base_time: int, increment: int, days: int, variant: str,
                          mode: str) -> str:
         """Create a challenge."""
-        params: dict[str, Union[str, int, bool]] = {"rated": mode == "rated", "variant": variant}
+        params: dict[str, str | int | bool] = {"rated": mode == "rated", "variant": variant}
 
         if days:
             params["days"] = days
@@ -141,7 +144,7 @@ class Matchmaking:
             weights = [1] * len(online_bots)
         return weights
 
-    def choose_opponent(self) -> tuple[Optional[str], int, int, int, str, str]:
+    def choose_opponent(self) -> tuple[str | None, int, int, int, str, str]:
         """Choose an opponent."""
         override_choice = random.choice(self.matchmaking_cfg.overrides.keys() + [None])
         logger.info(f"Using the {override_choice or 'default'} matchmaking configuration.")
@@ -154,16 +157,16 @@ class Matchmaking:
 
         base_time = random.choice(match_config.challenge_initial_time)
         increment = random.choice(match_config.challenge_increment)
-        days = random.choice(match_config.challenge_days)
+        num_days = random.choice(match_config.challenge_days)
 
-        play_correspondence = [bool(days), not bool(base_time or increment)]
+        play_correspondence = [bool(num_days), not bool(base_time or increment)]
         if random.choice(play_correspondence):
             base_time = 0
             increment = 0
         else:
-            days = 0
+            num_days = 0
 
-        game_type = game_category(variant, base_time, increment, days)
+        game_type = game_category(variant, base_time, increment, num_days)
 
         min_rating = match_config.opponent_min_rating
         max_rating = match_config.opponent_max_rating
@@ -181,6 +184,7 @@ class Matchmaking:
                     and perf.get("games", 0) > 0
                     and min_rating <= perf.get("rating", 0) <= max_rating)
 
+        self.online_block_list.refresh()
         online_bots = self.li.get_online_bots()
         online_bots = list(filter(is_suitable_opponent, online_bots))
 
@@ -206,7 +210,7 @@ class Matchmaking:
             else:
                 logger.error("No suitable bots found to challenge.")
 
-        return bot_username, base_time, increment, days, variant, mode
+        return bot_username, base_time, increment, num_days, variant, mode
 
     def get_random_config_value(self, config: Configuration, parameter: str, choices: list[str]) -> str:
         """Choose a random value from `choices` if the parameter value in the config is `random`."""
@@ -233,7 +237,7 @@ class Matchmaking:
         bot_username, base_time, increment, days, variant, mode = self.choose_opponent()
         logger.info(f"Will challenge {bot_username} for a {variant} game.")
         challenge_id = self.create_challenge(bot_username, base_time, increment, days, variant, mode) if bot_username else ""
-        logger.info(f"Challenge id is {challenge_id if challenge_id else 'None'}.")
+        logger.info(f"Challenge id is {challenge_id or 'None'}.")
         self.challenge_id = challenge_id
 
     def discard_challenge(self, challenge_id: str) -> None:
@@ -266,9 +270,9 @@ class Matchmaking:
 
     def in_block_list(self, username: str) -> bool:
         """Check if an opponent is in the block list to prevent future challenges."""
-        return not self.should_accept_challenge(username, "")
+        return (not self.should_accept_challenge(username, "")) or username in self.online_block_list
 
-    def add_challenge_filter(self, username: str, game_aspect: str, timeout: Union[datetime.timedelta, None] = None) -> None:
+    def add_challenge_filter(self, username: str, game_aspect: str, timeout: datetime.timedelta | None = None) -> None:
         """
         Prevent creating another challenge for a timeout when an opponent has declined a challenge.
 
@@ -333,20 +337,20 @@ class Matchmaking:
         self.show_earliest_challenge_time()
 
 
-def game_category(variant: str, base_time: int, increment: int, days: int) -> str:
+def game_category(variant: str, base_time: int, increment: int, num_days: int) -> str:
     """
     Get the game type (e.g. bullet, atomic, classical). Lichess has one rating for every variant regardless of time control.
 
     :param variant: The game's variant.
     :param base_time: The base time in seconds.
     :param increment: The increment in seconds.
-    :param days: If the game is correspondence, we have some days to play the move.
+    :param num_days: If the game is correspondence, we have some days to play the move.
     :return: The game category.
     """
     game_duration = base_time + increment * 40
     if variant != "standard":
         return variant
-    if days:
+    if num_days:
         return "correspondence"
     if game_duration < 179:
         return "bullet"

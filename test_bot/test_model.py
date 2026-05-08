@@ -5,6 +5,7 @@ from lib import model
 import yaml
 from lib import config
 from collections import defaultdict, Counter
+from lib.blocklist import OnlineBlocklist
 from lib.timer import Timer
 from lib.lichess_types import ChallengeType, UserProfileType, GameEventType, PlayerType
 
@@ -41,9 +42,13 @@ def test_challenge() -> None:
     CONFIG["token"] = ""
     CONFIG["challenge"]["allow_list"] = []
     CONFIG["challenge"]["block_list"] = []
+    CONFIG["challenge"]["min_rating"] = 0
+    CONFIG["challenge"]["max_rating"] = 4000
+    CONFIG["challenge"]["rating_difference"] = None
     configuration = config.Configuration(CONFIG).challenge
     recent_challenges: defaultdict[str, list[Timer]] = defaultdict()
     recent_challenges["c"] = []
+    online_block_list = OnlineBlocklist([])
 
     challenge_model = model.Challenge(challenge, user_profile)
     assert challenge_model.id == "zzzzzzzz"
@@ -52,10 +57,85 @@ def test_challenge() -> None:
     assert challenge_model.speed == "bullet"
     assert challenge_model.time_control["show"] == "1.5+1"
     assert challenge_model.color == "white"
-    assert challenge_model.is_supported(configuration, recent_challenges, Counter()) == (True, "")
+    supported = challenge_model.is_supported(configuration, recent_challenges, Counter(), online_block_list, user_profile)
+    assert supported == (True, "")
 
     CONFIG["challenge"]["min_base"] = 120
-    assert challenge_model.is_supported(configuration, recent_challenges, Counter()) == (False, "timeControl")
+    assert challenge_model.is_supported(configuration, recent_challenges, Counter(), online_block_list, user_profile) == (
+        False,
+        "timeControl",
+    )
+
+
+def test_challenge_rating_filters() -> None:
+    """Test challenge rating filtering for incoming challenges."""
+    challenge: ChallengeType = {"id": "zzzzzzzz", "url": "https://lichess.org/zzzzzzzz", "status": "created",
+                                "challenger": {"id": "c", "name": "c", "rating": 2000, "title": None, "online": True},
+                                "destUser": {"id": "b", "name": "b", "rating": 3000, "title": "BOT", "online": True},
+                                "variant": {"key": "standard", "name": "Standard", "short": "Std"}, "rated": False,
+                                "speed": "bullet",
+                                "timeControl": {"type": "clock", "limit": 90, "increment": 1, "show": "1.5+1"},
+                                "color": "random", "finalColor": "white", "perf": {"icon": "\ue032", "name": "Bullet"}}
+    user_profile: UserProfileType = {"id": "b", "username": "b",
+                                     "perfs": {"bullet": {"games": 100, "rating": 3000, "rd": 150, "prog": -10}},
+                                     "title": "BOT"}
+
+    with open("./config.yml.default") as file:
+        CONFIG = yaml.safe_load(file)
+    CONFIG["token"] = ""
+    CONFIG["challenge"]["allow_list"] = []
+    CONFIG["challenge"]["block_list"] = []
+    CONFIG["challenge"]["min_rating"] = 0
+    CONFIG["challenge"]["max_rating"] = 4000
+    CONFIG["challenge"]["rating_difference"] = None
+    configuration = config.Configuration(CONFIG).challenge
+    recent_challenges: defaultdict[str, list[Timer]] = defaultdict()
+    recent_challenges["c"] = []
+    online_block_list = OnlineBlocklist([])
+
+    challenge_model = model.Challenge(challenge, user_profile)
+
+    # Default config should accept all ratings
+    supported = challenge_model.is_supported(configuration, recent_challenges, Counter(), online_block_list, user_profile)
+    assert supported == (True, "")
+
+    # Test max_rating filter
+    CONFIG["challenge"]["max_rating"] = 1500
+    assert challenge_model.is_supported(configuration, recent_challenges, Counter(), online_block_list, user_profile) == (
+        False, "generic")
+
+    # Test min_rating filter
+    CONFIG["challenge"]["max_rating"] = 4000
+    CONFIG["challenge"]["min_rating"] = 2500
+    assert challenge_model.is_supported(configuration, recent_challenges, Counter(), online_block_list, user_profile) == (
+        False, "generic")
+
+    # Test rating_difference filter (bot is 3000, challenger is 2000, diff is 1000)
+    CONFIG["challenge"]["min_rating"] = 0
+    CONFIG["challenge"]["rating_difference"] = 500
+    assert challenge_model.is_supported(configuration, recent_challenges, Counter(), online_block_list, user_profile) == (
+        False, "generic")
+
+    # Rating difference large enough to accept
+    CONFIG["challenge"]["rating_difference"] = 1500
+    supported = challenge_model.is_supported(configuration, recent_challenges, Counter(), online_block_list, user_profile)
+    assert supported == (True, "")
+
+    # Test that rating_difference narrows the range
+    # min_rating=0, max_rating=4000, but diff=500 from bot rating 3000
+    CONFIG["challenge"]["rating_difference"] = 500
+    CONFIG["challenge"]["min_rating"] = 0
+    CONFIG["challenge"]["max_rating"] = 4000
+    assert challenge_model.is_supported(configuration, recent_challenges, Counter(), online_block_list, user_profile) == (
+        False, "generic")
+
+    # Test with AI opponent (no rating) - should always accept
+    CONFIG["challenge"]["rating_difference"] = None
+    CONFIG["challenge"]["max_rating"] = 1000
+    ai_challenge: ChallengeType = {**challenge,
+                                    "challenger": {"id": "ai", "name": "AI level 5", "aiLevel": 5}}
+    ai_challenge_model = model.Challenge(ai_challenge, user_profile)
+    assert ai_challenge_model.is_supported_rating(configuration, user_profile) is True
 
 
 def test_game() -> None:
@@ -75,6 +155,12 @@ def test_game() -> None:
     assert game_model.id == "zzzzzzzz"
     assert game_model.mode == "casual"
     assert game_model.is_white is False
+    assert game_model.my_color == "black"
+    assert game_model.url() == "https://lichess.org/zzzzzzzz/black"
+    assert game_model.short_url() == "https://lichess.org/zzzzzzzz"
+    assert game_model.pgn_event() == "Casual Bullet game"
+    assert game_model.time_control() == "90+1"
+    assert game_model.is_abortable() is True
 
 
 def test_player() -> None:
@@ -83,3 +169,17 @@ def test_player() -> None:
     player_model = model.Player(player)
     assert player_model.is_bot is True
     assert str(player_model) == "BOT b (3000)"
+
+
+def test_is_chess_960() -> None:
+    """Test the is_chess_960 function."""
+    items = [
+        {"fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", "type": "standard", "is_960": False},
+        {"fen": "brnkrqnb/pppppppp/8/8/8/8/PPPPPPPP/BRNKRQNB w KQkq - 0 1", "type": "960", "is_960": True},  # pos1
+        {"fen": "nrbbnkqr/pppppppp/8/8/8/8/PPPPPPPP/NRBBNKQR w KQkq - 0 1", "type": "960", "is_960": True},  # pos2
+    ]
+    for item in items:
+        fen = str(item["fen"])
+        expected = item["is_960"]
+        result = model.is_chess_960(fen)
+        assert result == expected

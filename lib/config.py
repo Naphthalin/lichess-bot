@@ -4,9 +4,8 @@ import yaml
 import os
 import logging
 import math
-import requests
-from abc import ABCMeta
-from typing import Any, Union, ItemsView, Callable
+from typing import Any
+from collections.abc import ItemsView, Callable
 from lib.lichess_types import CONFIG_DICT_TYPE, FilterType
 from lib.timer import minutes, days
 
@@ -47,7 +46,7 @@ class Configuration:
         """:return: All of the keys in this config."""
         return list(self.config.keys())
 
-    def __or__(self, other: Union[Configuration, CONFIG_DICT_TYPE]) -> Configuration:
+    def __or__(self, other: Configuration | CONFIG_DICT_TYPE) -> Configuration:
         """Create a copy of this configuration that is updated with values from the parameter."""
         other_dict = other.config if isinstance(other, Configuration) else other
         return Configuration(self.config | other_dict)
@@ -77,7 +76,7 @@ def config_warn(assertion: bool, warning_message: str) -> None:
         logger.warning(warning_message)
 
 
-def check_config_section(config: CONFIG_DICT_TYPE, data_name: str, data_type: ABCMeta, subsection: str = "") -> None:
+def check_config_section(config: CONFIG_DICT_TYPE, data_name: str, data_type: type, subsection: str = "") -> None:
     """
     Check the validity of a config section.
 
@@ -89,8 +88,9 @@ def check_config_section(config: CONFIG_DICT_TYPE, data_name: str, data_type: AB
     config_part = config[subsection] if subsection else config
     sub = f"`{subsection}` sub" if subsection else ""
     data_location = f"`{data_name}` subsection in `{subsection}`" if subsection else f"Section `{data_name}`"
-    type_error_message = {str: f"{data_location} must be a string wrapped in quotes.",
-                          dict: f"{data_location} must be a dictionary with indented keys followed by colons."}
+    type_error_message: dict[type, str] = {
+        str: f"{data_location} must be a string wrapped in quotes.",
+        dict: f"{data_location} must be a dictionary with indented keys followed by colons."}
     config_assert(data_name in config_part, f"Your config.yml does not have required {sub}section `{data_name}`.")
     config_assert(isinstance(config_part[data_name], data_type), type_error_message[data_type])
 
@@ -218,6 +218,9 @@ def insert_default_values(CONFIG: CONFIG_DICT_TYPE) -> None:
     set_config_default(CONFIG, "challenge", key="block_list", default=[], force_empty_values=True)
     set_config_default(CONFIG, "challenge", key="online_block_list", default=[], force_empty_values=True)
     set_config_default(CONFIG, "challenge", key="allow_list", default=[], force_empty_values=True)
+    set_config_default(CONFIG, "challenge", key="min_rating", default=0, force_empty_values=True)
+    set_config_default(CONFIG, "challenge", key="max_rating", default=4000, force_empty_values=True)
+    set_config_default(CONFIG, "challenge", key="rating_difference", default=None)
     set_config_default(CONFIG, "challenge", key="max_simultaneous_games_per_user", default=5)
     set_config_default(CONFIG, "correspondence", key="checkin_period", default=600)
     set_config_default(CONFIG, "correspondence", key="move_time", default=60, force_empty_values=True)
@@ -263,16 +266,6 @@ def process_block_list(CONFIG: CONFIG_DICT_TYPE) -> None:
 
     :param CONFIG: The bot's config.
     """
-    def parse_block_list_from_url(url: str) -> list[str]:
-        block_list = requests.get(url).text.strip()
-        return [username.strip() for username in block_list.split("\n")]
-
-    for url in CONFIG["matchmaking"]["online_block_list"]:
-        CONFIG["matchmaking"]["block_list"].extend(parse_block_list_from_url(url))
-
-    for url in CONFIG["challenge"]["online_block_list"]:
-        CONFIG["challenge"]["block_list"].extend(parse_block_list_from_url(url))
-
     if CONFIG["matchmaking"]["include_challenge_block_list"]:
         CONFIG["matchmaking"]["block_list"].extend(CONFIG["challenge"]["block_list"])
 
@@ -333,6 +326,12 @@ def validate_config(CONFIG: CONFIG_DICT_TYPE) -> None:
         game_type = "correspondence" if setting == "days" else "real-time"
         config_warn(CONFIG["challenge"][f"min_{setting}"] <= CONFIG["challenge"][f"max_{setting}"],
                     min_max_template.format(setting=setting, game_type=game_type))
+
+    config_warn(CONFIG["challenge"]["min_rating"] <= CONFIG["challenge"]["max_rating"],
+                "challenge.max_rating < challenge.min_rating will result in no challenges being accepted.")
+    config_warn(CONFIG["challenge"].get("rating_difference") is None
+                or CONFIG["challenge"].get("rating_difference", 0) >= 0,
+                "challenge.rating_difference < 0 will result in no challenges being accepted.")
 
     matchmaking = CONFIG["matchmaking"]
     matchmaking_enabled = matchmaking["allow_matchmaking"]

@@ -5,6 +5,7 @@ import logging
 import datetime
 import chess
 from enum import Enum
+from lib.blocklist import OnlineBlocklist
 from lib.timer import Timer, msec, seconds, sec_str, to_msec, to_seconds, years
 from lib.config import Configuration
 from collections import defaultdict, Counter
@@ -85,6 +86,24 @@ class Challenge:
         """Check whether the mode is supported."""
         return ("rated" if self.rated else "casual") in challenge_cfg.modes
 
+    def is_supported_rating(self, challenge_cfg: Configuration, user_profile: UserProfileType) -> bool:
+        """Check whether the challenger's rating is within the acceptable range."""
+        challenger_rating = self.challenger.rating
+        if challenger_rating is None:
+            return True
+
+        min_rating: int = challenge_cfg.min_rating
+        max_rating: int = challenge_cfg.max_rating
+        rating_diff: int | None = challenge_cfg.rating_difference
+
+        if rating_diff is not None:
+            bot_rating = user_profile.get("perfs", {}).get(self.perf_name.lower(), {}).get("rating")
+            if bot_rating:
+                min_rating = max(min_rating, bot_rating - rating_diff)
+                max_rating = min(max_rating, bot_rating + rating_diff)
+
+        return min_rating <= challenger_rating <= max_rating
+
     def is_supported_recent(self, config: Configuration, recent_bot_challenges: defaultdict[str, list[Timer]]) -> bool:
         """Check whether we have played a lot of games with this opponent recently. Only used when the opponent is a BOT."""
         # Filter out old challenges
@@ -107,13 +126,14 @@ class Challenge:
         return "" if requirement_met else decline_reason
 
     def is_supported(self, config: Configuration, recent_bot_challenges: defaultdict[str, list[Timer]],
-                     opponent_engagements: Counter[str]) -> tuple[bool, str]:
+                     opponent_engagements: Counter[str], online_block_list: OnlineBlocklist,
+                     user_profile: UserProfileType) -> tuple[bool, str]:
         """Whether the challenge is supported."""
         try:
             if self.from_self:
                 return True, ""
 
-            from extra_game_handlers import is_supported_extra  # noqa: PLC0415
+            from extra_game_handlers import is_supported_extra
 
             allowed_opponents: list[str] = list(filter(None, config.allow_list)) or [self.challenger.name]
             decline_reason = (self.decline_due_to(config.accept_bot or not self.challenger.is_bot, "noBot")
@@ -121,7 +141,9 @@ class Challenge:
                               or self.decline_due_to(self.is_supported_time_control(config), "timeControl")
                               or self.decline_due_to(self.is_supported_variant(config), "variant")
                               or self.decline_due_to(self.is_supported_mode(config), "casual" if self.rated else "rated")
+                              or self.decline_due_to(self.is_supported_rating(config, user_profile), "generic")
                               or self.decline_due_to(self.challenger.name not in config.block_list, "generic")
+                              or self.decline_due_to(self.challenger.name not in online_block_list, "generic")
                               or self.decline_due_to(self.challenger.name in allowed_opponents, "generic")
                               or self.decline_due_to(self.is_supported_recent(config, recent_bot_challenges), "later")
                               or self.decline_due_to(opponent_engagements[self.challenger.name]

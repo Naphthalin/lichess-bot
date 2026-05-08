@@ -24,6 +24,7 @@ import glob
 import platform
 import importlib.metadata
 import contextlib
+from lib.blocklist import OnlineBlocklist
 from lib.config import load_config, Configuration, log_config
 from lib.conversation import Conversation, ChatLine
 from lib.timer import Timer, seconds, msec, hours, to_seconds
@@ -39,10 +40,10 @@ from http.client import RemoteDisconnected
 from queue import Empty
 from multiprocessing.pool import Pool
 from collections import Counter
-from typing import Optional, Union, TypedDict, cast
+from typing import TypedDict, cast, TypeAlias
 from types import FrameType
-MULTIPROCESSING_LIST_TYPE = MutableSequence[model.Challenge]
-POOL_TYPE = Pool
+MULTIPROCESSING_LIST_TYPE: TypeAlias = MutableSequence[model.Challenge]
+POOL_TYPE: TypeAlias = Pool
 
 
 class PlayGameArgsType(TypedDict, total=False):
@@ -70,7 +71,7 @@ class VersioningType(TypedDict):
 
 logger = logging.getLogger(__name__)
 
-with open("lib/versioning.yml") as version_file:
+with open(os.path.join(os.path.dirname(__file__), "versioning.yml")) as version_file:
     versioning_info: VersioningType = yaml.safe_load(version_file)
 
 __version__ = versioning_info["lichess_bot_version"]
@@ -86,16 +87,13 @@ def disable_restart() -> None:
     stop.restart = False
 
 
-def signal_handler(signal: int, frame: Optional[FrameType]) -> None:  # noqa: ARG001
+def signal_handler(signal: int, frame: FrameType | None) -> None:  # noqa: ARG001
     """Terminate lichess-bot."""
-    in_starting_thread = __name__ == "__main__"
     if not stop.terminated:
-        if in_starting_thread:
-            logger.debug("Received SIGINT. Terminating client.")
+        logger.debug("Received SIGINT. Terminating client.")
         stop.terminated = True
     else:
-        if in_starting_thread:
-            logger.debug("Received second SIGINT. Quitting now.")
+        logger.debug("Received second SIGINT. Quitting now.")
         stop.force_quit = True
 
 
@@ -119,14 +117,14 @@ def watch_control_stream(control_queue: CONTROL_QUEUE_TYPE, li: lichess.Lichess)
     error = None
     while not stop.terminated:
         try:
-            response = li.get_event_stream()
-            lines = response.iter_lines()
-            for line in lines:
-                if line:
-                    event = json.loads(line.decode("utf-8"))
-                    control_queue.put_nowait(event)
-                else:
-                    control_queue.put_nowait({"type": "ping"})
+            with li.get_event_stream() as response:
+                lines = response.iter_lines()
+                for line in lines:
+                    if line:
+                        event = json.loads(line.decode("utf-8"))
+                        control_queue.put_nowait(event)
+                    else:
+                        control_queue.put_nowait({"type": "ping"})
         except Exception:
             error = traceback.format_exc()
             break
@@ -138,6 +136,7 @@ def do_correspondence_ping(control_queue: CONTROL_QUEUE_TYPE, period: datetime.t
     """
     Tell the engine to check the correspondence games.
 
+    :param control_queue: Queue to put events in.
     :param period: How many seconds to wait before sending a correspondence ping.
     """
     while not stop.terminated:
@@ -163,13 +162,13 @@ def write_pgn_records(pgn_queue: PGN_QUEUE_TYPE, config: Configuration, username
             pgn_queue.task_done()
 
 
-def logging_configurer(level: int, filename: Optional[str], disable_auto_logs: bool) -> None:
+def logging_configurer(level: int, filename: str | None, disable_auto_logs: bool) -> None:
     """
     Configure the logger.
 
     :param level: The logging level. Either `logging.INFO` or `logging.DEBUG`.
     :param filename: The filename to write the logs to. If it is `None` then the logs aren't written to a file.
-    :param auto_log_filename: The filename for the automatic logger. If it is `None` then the logs aren't written to a file.
+    :param disable_auto_logs: Whether to disable automatic logging.
     """
     console_handler = RichHandler()
     console_formatter = logging.Formatter("%(message)s")
@@ -207,7 +206,7 @@ def logging_configurer(level: int, filename: Optional[str], disable_auto_logs: b
                         force=True)
 
 
-def logging_listener_proc(queue: LOGGING_QUEUE_TYPE, level: int, log_filename: Optional[str],
+def logging_listener_proc(queue: LOGGING_QUEUE_TYPE, level: int, log_filename: str | None,
                           disable_auto_logging: bool) -> None:
     """
     Handle events from the logging queue.
@@ -218,7 +217,7 @@ def logging_listener_proc(queue: LOGGING_QUEUE_TYPE, level: int, log_filename: O
     logging_configurer(level, log_filename, disable_auto_logging)
     logger = logging.getLogger()
     while True:
-        task: Optional[logging.LogRecord] = None
+        task: logging.LogRecord | None = None
         try:
             task = queue.get(block=False)
         except Empty:
@@ -245,7 +244,7 @@ def thread_logging_configurer(queue: LOGGING_QUEUE_TYPE) -> None:
 
 
 def start(li: lichess.Lichess, user_profile: UserProfileType, config: Configuration, logging_level: int,
-          log_filename: Optional[str], disable_auto_logging: bool, one_game: bool = False) -> None:
+          log_filename: str | None, disable_auto_logging: bool, one_game: bool = False) -> None:
     """
     Start lichess-bot.
 
@@ -254,7 +253,7 @@ def start(li: lichess.Lichess, user_profile: UserProfileType, config: Configurat
     :param config: The config that the bot will use.
     :param logging_level: The logging level. Either `logging.INFO` or `logging.DEBUG`.
     :param log_filename: The filename to write the logs to. If it is `None` then the logs aren't written to a file.
-    :param auto_log_filename: The filename for the automatic logger. If it is `None` then the logs aren't written to a file.
+    :param disable_auto_logging: Whether to disable automatic logging.
     :param one_game: Whether the bot should play only one game. Only used in `test_bot/test_bot.py` to test lichess-bot.
     """
     logger.info(f"You're now connected to {config.url} and awaiting challenges.")
@@ -339,13 +338,14 @@ def lichess_bot_main(li: lichess.Lichess,
     :param control_queue: The queue containing all the events.
     :param correspondence_queue: The queue containing the correspondence games.
     :param logging_queue: The logging queue. Used by `logging_listener_proc`.
+    :param pgn_queue: The queue containing the PGN games.
     :param one_game: Whether the bot should play only one game. Only used in `test_bot/test_bot.py` to test lichess-bot.
     """
     max_games = config.challenge.concurrency
 
     one_game_completed = False
 
-    all_games = li.get_ongoing_games()
+    all_games = li.get_ongoing_games() or []
     prune_takeback_records(all_games)
     startup_correspondence_games = [game["gameId"]
                                     for game in all_games
@@ -365,6 +365,8 @@ def lichess_bot_main(li: lichess.Lichess,
                                       pgn_queue=pgn_queue)
 
     recent_bot_challenges: defaultdict[str, list[Timer]] = defaultdict(list)
+
+    online_block_list = OnlineBlocklist(config.challenge.online_block_list)
 
     if config.quit_after_all_games_finish:
         logger.info("When quitting, lichess-bot will first wait for all running games to finish.")
@@ -388,9 +390,18 @@ def lichess_bot_main(li: lichess.Lichess,
                 log_proc_count("Freed", active_games)
                 one_game_completed = True
             elif event["type"] == "challenge":
-                handle_challenge(event, li, challenge_queue, config.challenge, user_profile, recent_bot_challenges)
+                handle_challenge(event,
+                                 li,
+                                 challenge_queue,
+                                 config.challenge,
+                                 user_profile,
+                                 recent_bot_challenges,
+                                 online_block_list)
             elif event["type"] == "challengeDeclined":
                 matchmaker.declined_challenge(event)
+            elif event["type"] == "challengeCanceled":
+                active_games.discard(event["challenge"]["id"])
+                log_proc_count("Freed", active_games)
             elif event["type"] == "gameStart":
                 matchmaker.accepted_challenge(event)
                 start_game(event,
@@ -534,7 +545,10 @@ def sort_challenges(challenge_queue: MULTIPROCESSING_LIST_TYPE, challenge_config
 
 def game_is_active(li: lichess.Lichess, game_id: str) -> bool:
     """Determine if a game is still being played."""
-    return game_id in (ongoing_game["gameId"] for ongoing_game in li.get_ongoing_games())
+    active_games = li.get_ongoing_games()
+    if active_games is None:
+        return True
+    return game_id in (ongoing_game["gameId"] for ongoing_game in active_games)
 
 
 def start_game_thread(active_games: set[str], game_id: str, play_game_args: PlayGameArgsType, pool: POOL_TYPE) -> None:
@@ -601,16 +615,23 @@ def enough_time_to_queue(event: EventType, config: Configuration) -> bool:
 
 def handle_challenge(event: EventType, li: lichess.Lichess, challenge_queue: MULTIPROCESSING_LIST_TYPE,
                      challenge_config: Configuration, user_profile: UserProfileType,
-                     recent_bot_challenges: defaultdict[str, list[Timer]]) -> None:
+                     recent_bot_challenges: defaultdict[str, list[Timer]], online_block_list: OnlineBlocklist) -> None:
     """Handle incoming challenges. It either accepts, declines, or queues them to accept later."""
     chlng = model.Challenge(event["challenge"], user_profile)
     if chlng.from_self:
         return
 
-    opponent_engagements = Counter(game["opponent"]["username"] for game in li.get_ongoing_games())
+    active_games = li.get_ongoing_games() or []
+    opponent_engagements = Counter(game["opponent"]["username"] for game in active_games)
     opponent_engagements.update(challenge.challenger.name for challenge in challenge_queue)
 
-    is_supported, decline_reason = chlng.is_supported(challenge_config, recent_bot_challenges, opponent_engagements)
+    online_block_list.refresh()
+
+    is_supported, decline_reason = chlng.is_supported(challenge_config,
+                                                      recent_bot_challenges,
+                                                      opponent_engagements,
+                                                      online_block_list,
+                                                      user_profile)
     if is_supported:
         challenge_queue.append(chlng)
         sort_challenges(challenge_queue, challenge_config)
@@ -643,112 +664,113 @@ def play_game(li: lichess.Lichess,
     :param challenge_queue: The queue containing the challenges.
     :param correspondence_queue: The queue containing the correspondence games.
     :param logging_queue: The logging queue. Used by `logging_listener_proc`.
+    :param pgn_queue: The queue containing the PGN games.
     """
     thread_logging_configurer(logging_queue)
     logger = logging.getLogger(__name__)
 
-    response = li.get_game_stream(game_id)
-    lines = response.iter_lines()
+    with li.get_game_stream(game_id) as response:
+        lines = response.iter_lines()
 
-    # Initial response of stream will be the full game info. Store it.
-    initial_state = json.loads(next(lines).decode("utf-8"))
-    logger.debug(f"Initial state: {initial_state}")
-    abort_time = seconds(config.abort_time)
-    game = model.Game(initial_state, user_profile["username"], li.baseUrl, abort_time)
+        # Initial response of stream will be the full game info. Store it.
+        initial_state = json.loads(next(lines).decode("utf-8"))
+        logger.debug(f"Initial state: {initial_state}")
+        abort_time = seconds(config.abort_time)
+        game = model.Game(initial_state, user_profile["username"], li.baseUrl, abort_time)
 
-    with engine_wrapper.create_engine(config, game) as engine:
-        engine.get_opponent_info(game)
-        logger.debug(f"The engine for game {game_id} has pid={engine.get_pid()}")
-        conversation = Conversation(game, engine, li, __version__, challenge_queue)
+        with engine_wrapper.create_engine(config, game) as engine:
+            engine.get_opponent_info(game)
+            logger.debug(f"The engine for game {game_id} has pid={engine.get_pid()}")
+            conversation = Conversation(game, engine, li, __version__, challenge_queue)
 
-        logger.info(f"+++ {game}")
+            logger.info(f"+++ {game}")
 
-        is_correspondence = game.speed == "correspondence"
-        correspondence_cfg = config.correspondence
-        correspondence_move_time = seconds(correspondence_cfg.move_time)
-        correspondence_disconnect_time = seconds(correspondence_cfg.disconnect_time)
+            is_correspondence = game.speed == "correspondence"
+            correspondence_cfg = config.correspondence
+            correspondence_move_time = seconds(correspondence_cfg.move_time)
+            correspondence_disconnect_time = seconds(correspondence_cfg.disconnect_time)
 
-        engine_cfg = config.engine
-        ponder_cfg = correspondence_cfg if is_correspondence else engine_cfg
-        can_ponder = ponder_cfg.uci_ponder or ponder_cfg.ponder
-        move_overhead = msec(config.move_overhead)
-        delay = msec(config.rate_limiting_delay)
+            engine_cfg = config.engine
+            ponder_cfg = correspondence_cfg if is_correspondence else engine_cfg
+            can_ponder = ponder_cfg.uci_ponder or ponder_cfg.ponder
+            move_overhead = msec(config.move_overhead)
+            delay = msec(config.rate_limiting_delay)
 
-        takebacks_accepted = read_takeback_record(game)
-        max_takebacks_accepted = config.max_takebacks_accepted
+            takebacks_accepted = read_takeback_record(game)
+            max_takebacks_accepted = config.max_takebacks_accepted
 
-        keyword_map: defaultdict[str, str] = defaultdict(str, me=game.me.name, opponent=game.opponent.name)
-        hello = get_greeting("hello", config.greeting, keyword_map)
-        goodbye = get_greeting("goodbye", config.greeting, keyword_map)
-        hello_spectators = get_greeting("hello_spectators", config.greeting, keyword_map)
-        goodbye_spectators = get_greeting("goodbye_spectators", config.greeting, keyword_map)
+            keyword_map: defaultdict[str, str] = defaultdict(str, me=game.me.name, opponent=game.opponent.name)
+            hello = get_greeting("hello", config.greeting, keyword_map)
+            goodbye = get_greeting("goodbye", config.greeting, keyword_map)
+            hello_spectators = get_greeting("hello_spectators", config.greeting, keyword_map)
+            goodbye_spectators = get_greeting("goodbye_spectators", config.greeting, keyword_map)
 
-        disconnect_time = correspondence_disconnect_time if not game.state.get("moves") else seconds(0)
-        prior_game = None
-        board = chess.Board()
-        game_stream = itertools.chain([json.dumps(game.state).encode("utf-8")], lines)
-        quit_after_all_games_finish = config.quit_after_all_games_finish
-        stay_in_game = True
-        while stay_in_game and (not stop.terminated or quit_after_all_games_finish) and not stop.force_quit:
-            move_attempted = False
-            try:
-                upd = next_update(game_stream)
-                u_type = upd["type"] if upd else "ping"
-                if u_type == "chatLine":
-                    conversation.react(ChatLine(upd))
-                elif u_type == "gameState":
-                    game.state = upd
-                    board = setup_board(game)
-                    takeback_field = game.state.get("btakeback") if game.is_white else game.state.get("wtakeback")
+            disconnect_time = correspondence_disconnect_time if not game.state.get("moves") else seconds(0)
+            prior_game = None
+            board = chess.Board()
+            game_stream = itertools.chain([json.dumps(game.state).encode("utf-8")], lines)
+            quit_after_all_games_finish = config.quit_after_all_games_finish
+            stay_in_game = True
+            while stay_in_game and (not stop.terminated or quit_after_all_games_finish) and not stop.force_quit:
+                move_attempted = False
+                try:
+                    upd = next_update(game_stream)
+                    u_type = upd["type"] if upd else "ping"
+                    if u_type == "chatLine":
+                        conversation.react(ChatLine(upd))
+                    elif u_type == "gameState":
+                        game.state = upd
+                        board = setup_board(game)
+                        takeback_field = game.state.get("btakeback") if game.is_white else game.state.get("wtakeback")
 
-                    if not is_game_over(game) and is_engine_move(game, prior_game, board):
-                        disconnect_time = correspondence_disconnect_time
-                        say_hello(conversation, hello, hello_spectators, board)
-                        setup_timer = Timer()
-                        print_move_number(board)
-                        move_attempted = True
-                        engine.play_move(board,
-                                         game,
-                                         li,
-                                         setup_timer,
-                                         move_overhead,
-                                         can_ponder,
-                                         is_correspondence,
-                                         correspondence_move_time,
-                                         engine_cfg,
-                                         fake_think_time(config, board, game))
-                        time.sleep(to_seconds(delay))
-                    elif is_game_over(game):
-                        tell_user_game_result(game, board)
-                        engine.send_game_result(game, board)
-                        conversation.send_message("player", goodbye)
-                        conversation.send_message("spectator", goodbye_spectators)
-                    elif (takeback_field
-                            and not bot_to_move(game, board)
-                            and li.accept_takeback(game.id, takebacks_accepted < max_takebacks_accepted)):
-                        takebacks_accepted += 1
-                        record_takeback(game, takebacks_accepted)
-                        engine.discard_last_move_commentary()
+                        if not is_game_over(game) and is_engine_move(game, prior_game, board):
+                            disconnect_time = correspondence_disconnect_time
+                            say_hello(conversation, hello, hello_spectators, board)
+                            setup_timer = Timer()
+                            print_move_number(board)
+                            move_attempted = True
+                            engine.play_move(board,
+                                             game,
+                                             li,
+                                             setup_timer,
+                                             move_overhead,
+                                             can_ponder,
+                                             is_correspondence,
+                                             correspondence_move_time,
+                                             engine_cfg,
+                                             fake_think_time(config, board, game))
+                            time.sleep(to_seconds(delay))
+                        elif is_game_over(game):
+                            tell_user_game_result(game, board)
+                            engine.send_game_result(game, board)
+                            conversation.send_message("player", goodbye)
+                            conversation.send_message("spectator", goodbye_spectators)
+                        elif (takeback_field
+                                and not bot_to_move(game, board)
+                                and li.accept_takeback(game.id, takebacks_accepted < max_takebacks_accepted)):
+                            takebacks_accepted += 1
+                            record_takeback(game, takebacks_accepted)
+                            engine.discard_last_move_commentary()
 
-                    wbtime = upd[engine_wrapper.wbtime(board)]
-                    wbinc = upd[engine_wrapper.wbinc(board)]
-                    terminate_time = msec(wbtime) + msec(wbinc) + seconds(60)
-                    game.ping(abort_time, terminate_time, disconnect_time)
-                    prior_game = copy.deepcopy(game)
-                elif u_type == "ping" and should_exit_game(board, game, prior_game, li, is_correspondence):
-                    stay_in_game = False
-            except (HTTPError, ReadTimeout, RemoteDisconnected, ChunkedEncodingError, RequestsConnectionError,
-                    StopIteration) as e:
-                stopped = isinstance(e, StopIteration)
-                stay_in_game = not stopped and (move_attempted or game_is_active(li, game.id))
+                        wbtime = upd[engine_wrapper.wbtime(board)]
+                        wbinc = upd[engine_wrapper.wbinc(board)]
+                        terminate_time = msec(wbtime) + msec(wbinc) + seconds(60)
+                        game.ping(abort_time, terminate_time, disconnect_time)
+                        prior_game = copy.deepcopy(game)
+                    elif u_type == "ping" and should_exit_game(board, game, prior_game, li, is_correspondence):
+                        stay_in_game = False
+                except (HTTPError, ReadTimeout, RemoteDisconnected, ChunkedEncodingError, RequestsConnectionError,
+                        StopIteration) as e:
+                    stopped = isinstance(e, StopIteration)
+                    stay_in_game = not stopped and (move_attempted or game_is_active(li, game.id))
 
-        pgn_record = try_get_pgn_game_record(li, config, game, board, engine)
-    final_queue_entries(control_queue, correspondence_queue, game, is_correspondence, pgn_record, pgn_queue)
-    delete_takeback_record(game)
+            pgn_record = try_get_pgn_game_record(li, config, game, board, engine)
+        final_queue_entries(control_queue, correspondence_queue, game, is_correspondence, pgn_record, pgn_queue)
+        delete_takeback_record(game)
 
 
 def read_takeback_record(game: model.Game) -> int:
-    """Read the number of move takeback requests accepeted in a game."""
+    """Read the number of move takeback requests accepted in a game."""
     try:
         with open(takeback_record_file_name(game.id)) as takeback_file:
             return int(takeback_file.read())
@@ -757,7 +779,7 @@ def read_takeback_record(game: model.Game) -> int:
 
 
 def record_takeback(game: model.Game, accepted_count: int) -> None:
-    """Record the number of move takeback requests accepeted in a game."""
+    """Record the number of move takeback requests accepted in a game."""
     with open(takeback_record_file_name(game.id), "w") as takeback_file:
         takeback_file.write(str(accepted_count))
 
@@ -848,7 +870,7 @@ def setup_board(game: model.Game) -> chess.Board:
     return board
 
 
-def is_engine_move(game: model.Game, prior_game: Optional[model.Game], board: chess.Board) -> bool:
+def is_engine_move(game: model.Game, prior_game: model.Game | None, board: chess.Board) -> bool:
     """Check whether it is the engine's turn."""
     return game_changed(game, prior_game) and bot_to_move(game, board)
 
@@ -870,7 +892,7 @@ def is_game_over(game: model.Game) -> bool:
     return status != "started"
 
 
-def should_exit_game(board: chess.Board, game: model.Game, prior_game: Optional[model.Game], li: lichess.Lichess,
+def should_exit_game(board: chess.Board, game: model.Game, prior_game: model.Game | None, li: lichess.Lichess,
                      is_correspondence: bool) -> bool:
     """Whether we should exit a game."""
     if (is_correspondence
@@ -908,7 +930,7 @@ def final_queue_entries(control_queue: CONTROL_QUEUE_TYPE, correspondence_queue:
                                    "complete": is_game_over(game)}})
 
 
-def game_changed(current_game: model.Game, prior_game: Optional[model.Game]) -> bool:
+def game_changed(current_game: model.Game, prior_game: model.Game | None) -> bool:
     """Check whether the current game state is different from the previous game state."""
     if prior_game is None:
         return True
@@ -1008,8 +1030,8 @@ def pgn_game_record(li: lichess.Lichess, config: Configuration, game: model.Game
 
     fill_missing_pgn_headers(game_record, game)
 
-    current_node: Union[chess.pgn.Game, chess.pgn.ChildNode] = game_record.game()
-    lichess_node: Union[chess.pgn.Game, chess.pgn.ChildNode] = lichess_game_record.game()
+    current_node: chess.pgn.Game | chess.pgn.ChildNode = game_record.game()
+    lichess_node: chess.pgn.Game | chess.pgn.ChildNode = lichess_game_record.game()
     for index, move in enumerate(board.move_stack):
         next_node = current_node.next()
         if next_node is None or next_node.move != move:
@@ -1067,14 +1089,14 @@ def fill_missing_pgn_headers(game_record: chess.pgn.Game, game: model.Game) -> N
             game_record.headers[header] = str(game_value)
 
 
-def get_headers(game: model.Game) -> dict[str, Union[str, int]]:
+def get_headers(game: model.Game) -> dict[str, str | int]:
     """
     Create local headers to be written in the PGN file.
 
     :param game: Contains information about the game (e.g. the players' names).
     :return: The headers in a dict.
     """
-    headers: dict[str, Union[str, int]] = {}
+    headers: dict[str, str | int] = {}
     headers["Event"] = game.pgn_event()
     headers["Site"] = game.short_url()
     headers["Date"] = game.game_start.strftime("%Y.%m.%d")
