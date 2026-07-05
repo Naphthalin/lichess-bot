@@ -53,7 +53,8 @@ class Matchmaking:
     def should_create_challenge(self) -> bool:
         """Whether we should create a challenge."""
         matchmaking_enabled = self.matchmaking_cfg.allow_matchmaking
-        time_has_passed = self.last_game_ended_delay.is_expired() and self.rate_limit_timer.is_expired()
+        rate_limit_ok = self.rate_limit_timer.is_expired()
+        time_has_passed = self.last_game_ended_delay.is_expired()
         challenge_expired = self.last_challenge_created_delay.is_expired() and self.challenge_id
         min_wait_time_passed = self.last_challenge_created_delay.time_since_reset() > self.min_wait_time
         if challenge_expired:
@@ -61,7 +62,7 @@ class Matchmaking:
             logger.info(f"Challenge id {self.challenge_id} cancelled.")
             self.discard_challenge(self.challenge_id)
             self.show_earliest_challenge_time()
-        return bool(matchmaking_enabled and (time_has_passed or challenge_expired) and min_wait_time_passed)
+        return bool(matchmaking_enabled and rate_limit_ok and (time_has_passed or challenge_expired) and min_wait_time_passed)
 
     def create_challenge(self, username: str, base_time: int, increment: int, days: int, variant: str,
                          mode: str) -> str:
@@ -186,7 +187,9 @@ class Matchmaking:
 
         self.online_block_list.refresh()
         online_bots = self.li.get_online_bots()
+        logger.info(f"Found {len(online_bots)} online bots")
         online_bots = list(filter(is_suitable_opponent, online_bots))
+        logger.info(f"Choosing from {len(online_bots)} suitable opponents")
 
         def ready_for_challenge(bot: UserProfileType) -> bool:
             aspects = [variant, game_type, mode] if self.challenge_filter == FilterType.FINE else []
@@ -217,26 +220,41 @@ class Matchmaking:
         value: str = config.lookup(parameter)
         return value if value != "random" else random.choice(choices)
 
-    def challenge(self, active_games: set[str], challenge_queue: MULTIPROCESSING_LIST_TYPE, max_games: int) -> None:
+    def challenge(self, active_games: dict[str, str], challenge_queue: MULTIPROCESSING_LIST_TYPE,
+                  max_bot_games: int) -> None:
         """
         Challenge an opponent.
 
-        :param active_games: The games that the bot is playing.
+        :param active_games: The games that the bot is playing (game ID -> opponent name).
         :param challenge_queue: The queue containing the challenges.
-        :param max_games: The maximum allowed number of simultaneous games.
+        :param max_bot_games: The maximum allowed number of simultaneous games against bots.
         """
-        max_games_for_matchmaking = max_games if self.matchmaking_cfg.allow_during_games else min(1, max_games)
-        game_count = len(active_games) + len(challenge_queue)
-        if (game_count >= max_games_for_matchmaking
-                or (game_count > 0 and self.last_challenge_created_delay.time_since_reset() < self.max_wait_time)
+        # If matchmaking is not allowed while playing other games, don't create
+        # a challenge when any game (against a bot or a human) is in progress.
+        if not self.matchmaking_cfg.allow_during_games and active_games:
+            return
+
+        # Count only games against bots: matchmaking only challenges bots, and
+        # human games must not count toward the bot-game limit (otherwise a bot
+        # whose slots are filled by humans would stop matchmaking even though
+        # bot slots remain free).
+        bot_game_count = model.Player.count_bot_games(active_games) + len(challenge_queue)
+        if (bot_game_count >= max_bot_games
+                or (bot_game_count > 0 and self.last_challenge_created_delay.time_since_reset() < self.max_wait_time)
                 or not self.should_create_challenge()):
             return
 
         logger.info("Challenging a random bot")
         self.update_user_profile()
         bot_username, base_time, increment, days, variant, mode = self.choose_opponent()
+        if not bot_username:
+            logger.info("No challenge will be created.")
+            self.challenge_id = ""
+            self.rate_limit_timer = Timer(seconds(60))
+            return
+
         logger.info(f"Will challenge {bot_username} for a {variant} game.")
-        challenge_id = self.create_challenge(bot_username, base_time, increment, days, variant, mode) if bot_username else ""
+        challenge_id = self.create_challenge(bot_username, base_time, increment, days, variant, mode)
         logger.info(f"Challenge id is {challenge_id or 'None'}.")
         self.challenge_id = challenge_id
 

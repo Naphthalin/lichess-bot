@@ -173,6 +173,7 @@ will precede the `go` command to start thinking with `sd 5`. The other `go_comma
 ## Challenges the BOT should accept
 - `challenge`: Control what kind of games for which the bot should accept challenges. All of the following options must be satisfied by a challenge to be accepted.
   - `concurrency`: The maximum number of games to play simultaneously.
+  - `games_reserved_for_humans`: The number of game slots (out of `concurrency`) to keep open for human challengers. Bot challenges are limited to `concurrency` minus this value, so humans can still challenge the bot even when other bots are filling its games. Should be between 0 and `concurrency`. Works best with `preference` set to `"human"`.
   - `sort_by`: Whether to start games by the best rated/titled opponent `"best"` or by first-come-first-serve `"first"`.
   - `preference`: Whether to prioritize human opponents, bot opponents, or treat them equally.
   - `accept_bot`: Whether to accept challenges from other bots.
@@ -278,7 +279,7 @@ will precede the `go` command to start thinking with `sd 5`. The other `go_comma
     The `challenge_filter` option can be useful if your matchmaking settings result in a lot of declined challenges. The bots that accept challenges will be challenged more often than those that have declined. The filter will remain until lichess-bot quits or the connection with lichess.org is reset.
   - `block_list`: An indented list of usernames of bots that will not be challenged. If this option is not present, then the list is considered empty.
   - `online_block_list`: An indented list of urls from which additional block lists are retrieved. An online block list is a plain text file where each line contains a single username. If this option is not present, then the list is considered empty.
-  - `include_challenge_block_list`: If `true`, do not send challenges to the bots listed in the `challenge: block_list`. Default is `false`.
+  - `include_challenge_block_list`: If `true`, do not send challenges to the bots listed in the `challenge: block_list` or `challenge: online_block_list`. Default is `false`.
   - `overrides`: Create variations on the matchmaking settings above for more specific circumstances. If there are any subsections under `overrides`, the settings below that will override the settings in the matchmaking section. Any settings that do not appear will be taken from the settings above. <br/> <br/>
   The overrides section must have the following:
     - Name: A unique name must be given for each override. In the example configuration below, `easy_chess960` and `no_pressure_correspondence` are arbitrary strings to name the subsections and they are unique.

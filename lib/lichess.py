@@ -145,6 +145,7 @@ class Lichess:
         self.logging_level = logging_level
         self.max_retries = max_retries
         self.rate_limit_timers: defaultdict[str, Timer] = defaultdict(Timer)
+        self.challenge_rate_limit_backoff = seconds(60)
 
         # Confirm that the OAuth token has the proper permission to play on lichess
         token_response = cast(TOKEN_TESTS_TYPE, self.api_post("token_test", data=token))
@@ -308,6 +309,28 @@ class Lichess:
             challenge_response["bot_is_rate_limited"] = bot_is_rate_limited
             challenge_response["opponent_is_rate_limited"] = opponent_is_rate_limited
             challenge_response["rate_limit_timeout"] = delay
+        elif is_new_rate_limit(response):
+            # Generic 429 without a ratelimit body (no bot.vsBot.day key). Honor
+            # Retry-After if lichess sent it, otherwise back off exponentially
+            # (60 → 120 → 240 → 480, capped at 600s) so repeated 429s escalate
+            # the cooldown instead of retrying at the same short interval.
+            delay = None
+            retry_after = response.headers.get("Retry-After")
+            if retry_after:
+                try:
+                    delay = seconds(float(retry_after))
+                except ValueError:
+                    delay = None
+            if delay is None:
+                delay = self.challenge_rate_limit_backoff
+                self.challenge_rate_limit_backoff = min(seconds(600), self.challenge_rate_limit_backoff * 2)
+            self.set_rate_limit_delay(ENDPOINTS["challenge"], delay)
+            challenge_response["bot_is_rate_limited"] = True
+            challenge_response["opponent_is_rate_limited"] = False
+            challenge_response["rate_limit_timeout"] = delay
+        else:
+            # Any non-429 response resets the backoff to its floor.
+            self.challenge_rate_limit_backoff = seconds(60)
 
         return challenge_response
 
@@ -431,7 +454,7 @@ class Lichess:
     def get_online_bots(self) -> list[UserProfileType]:
         """Get a list of bots that are online."""
         try:
-            online_bots_str = self.api_get_raw("online_bots")
+            online_bots_str = self.api_get_raw("online_bots", params={"nb": "512"})
             online_bots = list(filter(bool, online_bots_str.split("\n")))
             return list(map(json.loads, online_bots))
         except Exception:
@@ -446,8 +469,8 @@ class Lichess:
         """Cancel a challenge."""
         self.api_post("cancel", challenge_id, raise_for_status=False)
 
-    def online_book_get(self, path: str, params: dict[str, str | int] | None = None,
-                        stream: bool = False) -> OnlineType:
+    def online_book_get(self, path: str, params: dict[str, str | int] | None = None, *,
+                        stream: bool = False, authenticated: bool = False) -> OnlineType:
         """Get an external move from online sources (chessdb or lichess.org)."""
         @backoff.on_exception(backoff.constant,
                               (RemoteDisconnected, RequestsConnectionError, HTTPError, ReadTimeout),
@@ -459,7 +482,8 @@ class Lichess:
                               backoff_log_level=logging.DEBUG,
                               giveup_log_level=logging.DEBUG)
         def online_book_get() -> OnlineType:
-            json_response: OnlineType = self.other_session.get(path, timeout=2, params=params, stream=stream).json()
+            session = self.session if authenticated else self.other_session  # Choose session based on authentication need
+            json_response: OnlineType = session.get(path, timeout=2, params=params, stream=stream).json()
             return json_response
         return online_book_get()
 
